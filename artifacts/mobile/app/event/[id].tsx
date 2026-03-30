@@ -39,14 +39,6 @@ export default function EventDetailScreen() {
   const joinMutation = useMutation({
     mutationFn: async () => {
       if (!user || !event) return;
-      if (!canJoinEvent && !isJoined) {
-        router.push('/paywall');
-        throw new Error('Limit reached');
-      }
-      if (event.is_premium_only && !profile?.is_pro && !isJoined) {
-        router.push('/paywall');
-        throw new Error('Premium Only');
-      }
       if (isJoined) {
         const { error } = await supabase.rpc('leave_event', { p_event_id: event.id });
         if (error) throw error;
@@ -62,7 +54,11 @@ export default function EventDetailScreen() {
       refreshProfile();
     },
     onError: (err: Error) => {
-      if (err.message !== 'Limit reached' && err.message !== 'Premium Only') Alert.alert('Fehler', err.message);
+      if (err.message.includes('PREMIUM_ONLY') || err.message.includes('FREE_LIMIT_EVENTS')) {
+        router.push('/paywall');
+      } else {
+        Alert.alert('Fehler', err.message);
+      }
     },
   });
 

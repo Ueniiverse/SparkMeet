@@ -25,6 +25,40 @@ export default function ProfileScreen() {
     enabled: !!user,
   });
 
+  const { data: streak = 0 } = useQuery<number>({
+    queryKey: ['streak', user?.id, profile?.events_joined],
+    queryFn: async () => {
+      const joined = profile?.events_joined ?? [];
+      if (joined.length === 0) return 0;
+      const { data } = await supabase
+        .from('events')
+        .select('event_date')
+        .in('id', joined)
+        .lte('event_date', new Date().toISOString())
+        .order('event_date', { ascending: false });
+      if (!data || data.length === 0) return 0;
+
+      const weekKey = (d: Date) => {
+        const epoch = new Date(d.getFullYear(), 0, 1);
+        return `${d.getFullYear()}-${Math.floor((d.getTime() - epoch.getTime()) / 6048e5)}`;
+      };
+      const weeks = new Set(data.map(e => weekKey(new Date(e.event_date))));
+
+      let count = 0;
+      const cursor = new Date();
+      while (true) {
+        if (weeks.has(weekKey(cursor))) {
+          count++;
+          cursor.setDate(cursor.getDate() - 7);
+        } else {
+          break;
+        }
+      }
+      return count;
+    },
+    enabled: !!user && (profile?.events_joined?.length ?? 0) > 0,
+  });
+
   const handleSignOut = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await signOut();
@@ -83,7 +117,7 @@ export default function ProfileScreen() {
         {[
           { label: 'Events', value: eventsJoined },
           { label: 'Matches', value: matchCount },
-          { label: 'Streak', value: '—' },
+          { label: 'Streak', value: streak > 0 ? `${streak}W` : '—' },
         ].map((stat, i) => (
           <View key={i} style={styles.statBox}>
             <Text style={styles.statValue}>{stat.value}</Text>

@@ -103,7 +103,7 @@ export default function PhotosScreen() {
         'onboarding_looking_for', 'onboarding_interests',
       ]);
 
-      router.replace('/(tabs)/');
+      router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('Fehler', e?.message ?? 'Profil konnte nicht gespeichert werden.');
     } finally {

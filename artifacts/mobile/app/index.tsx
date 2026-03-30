@@ -19,7 +19,7 @@ export default function Index() {
   if (!session) return <Redirect href="/(auth)/login" />;
 
   const hasProfile = profile?.display_name && profile?.age && (profile?.profile_images?.length ?? 0) > 0;
-  if (!hasProfile) return <Redirect href="/(onboarding)/" />;
+  if (!hasProfile) return <Redirect href="/(onboarding)" />;
 
-  return <Redirect href="/(tabs)/" />;
+  return <Redirect href="/(tabs)" />;
 }

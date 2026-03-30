@@ -112,7 +112,7 @@ CREATE POLICY "events_select" ON events FOR SELECT USING (true);
 DROP POLICY IF EXISTS "events_insert" ON events;
 CREATE POLICY "events_insert" ON events FOR INSERT WITH CHECK (auth.uid() = host_id);
 
--- Only host can update event metadata (join/leave uses a SECURITY DEFINER RPC)
+-- Only host can update event metadata (join/leave uses SECURITY DEFINER RPCs)
 DROP POLICY IF EXISTS "events_update_host" ON events;
 DROP POLICY IF EXISTS "events_update_participant" ON events;
 CREATE POLICY "events_update_host" ON events FOR UPDATE
@@ -126,13 +126,11 @@ CREATE POLICY "events_delete" ON events FOR DELETE USING (auth.uid() = host_id);
 DROP POLICY IF EXISTS "matches_select" ON matches;
 CREATE POLICY "matches_select" ON matches FOR SELECT USING (auth.uid() = user_id_1 OR auth.uid() = user_id_2);
 
--- Match creation uses SECURITY DEFINER RPC; direct insert only allowed if mutual like exists
+-- Match creation restricted: caller must be a party AND a mutual event_like must exist
 DROP POLICY IF EXISTS "matches_insert" ON matches;
 CREATE POLICY "matches_insert" ON matches FOR INSERT WITH CHECK (
-  -- Caller must be one of the two parties
   (auth.uid() = user_id_1 OR auth.uid() = user_id_2)
   AND
-  -- A mutual like must exist for this event between these two users
   EXISTS (
     SELECT 1 FROM event_likes el1
     JOIN event_likes el2
@@ -180,7 +178,7 @@ CREATE POLICY "messages_update" ON messages FOR UPDATE USING (
   )
 );
 
--- Event likes: only participants can like, and only about other participants
+-- Event likes: only participants can like
 DROP POLICY IF EXISTS "event_likes_select" ON event_likes;
 CREATE POLICY "event_likes_select" ON event_likes FOR SELECT
   USING (auth.uid() = from_user_id OR auth.uid() = to_user_id);
@@ -197,18 +195,25 @@ CREATE POLICY "event_likes_insert" ON event_likes FOR INSERT WITH CHECK (
 
 -- ============================================================
 -- SECURITY DEFINER RPCs
--- These bypass RLS to perform tightly-scoped participant updates
--- and match creation atomically.
+-- Bypass RLS for tightly-scoped participant operations.
+-- Freemium limits enforced server-side here.
 -- ============================================================
 
--- join_event: Authenticated user joins an event
+-- Free tier constants
+-- FREE_MAX_EVENTS = 3, FREE_MAX_MATCHES = 5
+
+-- join_event: Authenticated user joins an event (enforces free-tier caps + premium-only gate)
 CREATE OR REPLACE FUNCTION join_event(p_event_id UUID)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER AS $$
 DECLARE
   v_participants TEXT[];
   v_max INT;
   v_is_premium BOOLEAN;
+  v_user_events_count INT;
+  v_user_is_pro BOOLEAN;
+  v_user_pro_expires TIMESTAMPTZ;
 BEGIN
+  -- Load event info
   SELECT current_participants, max_participants, is_premium_only
   INTO v_participants, v_max, v_is_premium
   FROM events WHERE id = p_event_id;
@@ -216,20 +221,46 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Event not found';
   END IF;
+
+  -- Already joined — idempotent
   IF auth.uid()::text = ANY(v_participants) THEN
-    RETURN; -- Already joined
+    RETURN;
   END IF;
-  IF array_length(v_participants, 1) >= v_max THEN
+
+  -- Load caller's Pro status
+  SELECT is_pro, pro_expires_at, array_length(events_joined, 1)
+  INTO v_user_is_pro, v_user_pro_expires, v_user_events_count
+  FROM profiles WHERE id = auth.uid();
+
+  -- Determine effective Pro status (expired subscriptions treated as free)
+  IF v_user_pro_expires IS NOT NULL AND v_user_pro_expires < NOW() THEN
+    v_user_is_pro := FALSE;
+  END IF;
+
+  -- Enforce premium-only gate
+  IF v_is_premium AND NOT COALESCE(v_user_is_pro, FALSE) THEN
+    RAISE EXCEPTION 'PREMIUM_ONLY';
+  END IF;
+
+  -- Enforce free-tier event cap (3 events max)
+  IF NOT COALESCE(v_user_is_pro, FALSE) AND COALESCE(v_user_events_count, 0) >= 3 THEN
+    RAISE EXCEPTION 'FREE_LIMIT_EVENTS';
+  END IF;
+
+  -- Check capacity
+  IF COALESCE(array_length(v_participants, 1), 0) >= v_max THEN
     RAISE EXCEPTION 'Event is full';
   END IF;
 
+  -- Join
   UPDATE events
   SET current_participants = array_append(current_participants, auth.uid()::text)
   WHERE id = p_event_id;
 
   UPDATE profiles
-  SET events_joined = array_append(events_joined, p_event_id::text)
-  WHERE id = auth.uid() AND NOT (p_event_id::text = ANY(events_joined));
+  SET events_joined = array_append(events_joined, p_event_id::text),
+      last_active = NOW()
+  WHERE id = auth.uid() AND NOT (p_event_id::text = ANY(COALESCE(events_joined, ARRAY[]::TEXT[])));
 END;
 $$;
 
@@ -242,7 +273,8 @@ BEGIN
   WHERE id = p_event_id;
 
   UPDATE profiles
-  SET events_joined = array_remove(events_joined, p_event_id::text)
+  SET events_joined = array_remove(events_joined, p_event_id::text),
+      last_active = NOW()
   WHERE id = auth.uid();
 END;
 $$;
@@ -261,6 +293,8 @@ GRANT EXECUTE ON FUNCTION leave_event(UUID) TO authenticated;
 
 -- ============================================================
 -- SEED DATA — 10 Munich events for the next 2 weeks
+-- Uses only the 8 app categories: Kochen, Wandern, Sport, Kultur,
+-- Spieleabend, Café, Konzert, Yoga
 -- ============================================================
 
 INSERT INTO events (title, description, category, host_name, location_name, address, event_date, duration_minutes, max_participants, price, status, tags, is_premium_only) VALUES
@@ -278,41 +312,41 @@ INSERT INTO events (title, description, category, host_name, location_name, addr
 ('Brettspielabend: Catan, Codenames & mehr',
  'Spieleabend mit Catan, Codenames, 7 Wonders und Mysterium. BYOB! Anfänger & Profis willkommen.',
  'Spieleabend', 'SparkMeet Team', 'Spielecafé Schwabing', 'Leopoldstr. 85, 80802 München',
- NOW() + INTERVAL '3 days' + INTERVAL '18 hours' + INTERVAL '30 minutes', 180, 8, 5, 'upcoming', ARRAY['Spiele', 'Gesellschaft'], false),
+ NOW() + INTERVAL '3 days' + INTERVAL '18 hours' + INTERVAL '30 minutes', 180, 8, 5, 'upcoming', ARRAY['Spieleabend'], false),
 
 ('Wanderung: Tegernsee Panoramaweg',
  'Entspannte 12km-Wanderung rund um den Tegernsee mit Picknick-Stop. Festes Schuhwerk empfohlen.',
  'Wandern', 'SparkMeet Team', 'Tegernsee', 'Bahnhof Tegernsee, 83684 Tegernsee',
  NOW() + INTERVAL '4 days' + INTERVAL '9 hours', 240, 12, 0, 'upcoming', ARRAY['Wandern', 'Natur'], false),
 
-('Improv-Theater Workshop',
- 'Lerne Improvisationstheater in einer lockeren Gruppe — kein Vorwissen nötig! Viel Spaß garantiert.',
- 'Kreativ', 'SparkMeet Team', 'Theater Halle 7', 'Dachauer Str. 90, 80335 München',
- NOW() + INTERVAL '5 days' + INTERVAL '19 hours' + INTERVAL '30 minutes', 120, 8, 10, 'upcoming', ARRAY['Theater', 'Kreativ'], false),
+('Kulturabend: Pinakothek & Abendessen',
+ 'Gemeinsamer Besuch der Pinakothek der Moderne, anschließend Abendessen in der Nähe. Eintritt inklusive.',
+ 'Kultur', 'SparkMeet Team', 'Pinakothek der Moderne', 'Barer Str. 40, 80333 München',
+ NOW() + INTERVAL '5 days' + INTERVAL '17 hours', 180, 8, 10, 'upcoming', ARRAY['Kultur', 'Kunst'], false),
 
 ('Yoga & Meditation im Olympiapark',
  'Kombinierter Yoga- und Meditations-Kurs für Einsteiger am Olympiasee. Bitte Matte mitbringen.',
  'Yoga', 'SparkMeet Team', 'Olympiapark München', 'Olympiazentrum, 80809 München',
  NOW() + INTERVAL '6 days' + INTERVAL '10 hours', 90, 10, 0, 'upcoming', ARRAY['Yoga', 'Meditation'], false),
 
-('Craft-Beer Tasting',
- 'Wir verkosten 8 lokale Craft-Biere aus Bayern mit kleinen Snacks. Kein Bierkenner nötig.',
- 'Essen & Trinken', 'SparkMeet Team', 'Hopfenreich München', 'Nockherstr. 30, 81541 München',
- NOW() + INTERVAL '7 days' + INTERVAL '18 hours', 120, 8, 15, 'upcoming', ARRAY['Bier', 'Tasting'], false),
+('Café-Hopping Schwabing',
+ 'Wir besuchen 3 ausgesuchte Cafés in Schwabing — Kaffee, Kuchen und gute Gespräche garantiert.',
+ 'Café', 'SparkMeet Team', 'Treffpunkt Münchner Freiheit', 'Münchner Freiheit, 80802 München',
+ NOW() + INTERVAL '7 days' + INTERVAL '14 hours', 150, 8, 0, 'upcoming', ARRAY['Café', 'Schwabing'], false),
 
 ('Klettern für Einsteiger',
  'Kletterkurs für absolute Anfänger — Sicherung, Technik und erste Routen. Equipment inklusive.',
  'Sport', 'SparkMeet Team', 'DAV Kletterzentrum München', 'Thalkirchner Str. 207, 81371 München',
- NOW() + INTERVAL '8 days' + INTERVAL '17 hours', 150, 6, 12, 'upcoming', ARRAY['Klettern', 'Sport'], false),
+ NOW() + INTERVAL '8 days' + INTERVAL '17 hours', 150, 6, 12, 'upcoming', ARRAY['Sport', 'Klettern'], false),
+
+('Jazzkonzert: Blue Note Evening',
+ 'Live-Jazz-Abend mit lokalen Münchner Bands. Dresscode: smart casual. Tisch-Reservierung inklusive.',
+ 'Konzert', 'SparkMeet Team', 'Jazz-Bar Unterfahrt', 'Einsteinstr. 42, 81675 München',
+ NOW() + INTERVAL '10 days' + INTERVAL '20 hours', 180, 8, 25, 'upcoming', ARRAY['Konzert', 'Jazz'], true),
 
 ('Sushi-Kochkurs',
  'Lerne Sushi-Rollen, Nigiri und Sashimi selbst herzustellen. Alle Zutaten werden gestellt.',
  'Kochen', 'SparkMeet Team', 'Kochschule Asiavibe', 'Rosenheimer Str. 145, 81671 München',
- NOW() + INTERVAL '10 days' + INTERVAL '18 hours' + INTERVAL '30 minutes', 180, 8, 25, 'upcoming', ARRAY['Kochen', 'Japan'], true),
-
-('Abendspaziergang: Isar Nordufer',
- 'Entspannter 8km-Abendspaziergang entlang der Isar von Wiener Platz bis Flaucher mit Grillstation.',
- 'Wandern', 'SparkMeet Team', 'Wiener Platz', 'Wiener Platz, 81667 München',
- NOW() + INTERVAL '12 days' + INTERVAL '18 hours', 120, 12, 0, 'upcoming', ARRAY['Spazieren', 'Isar'], false)
+ NOW() + INTERVAL '12 days' + INTERVAL '18 hours' + INTERVAL '30 minutes', 180, 8, 20, 'upcoming', ARRAY['Kochen', 'Japan'], false)
 
 ON CONFLICT DO NOTHING;

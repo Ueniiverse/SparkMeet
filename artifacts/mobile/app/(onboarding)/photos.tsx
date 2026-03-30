@@ -12,10 +12,12 @@ import { supabase } from '@/lib/supabase';
 import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
+import { useProfile } from '@/context/ProfileContext';
 
 export default function PhotosScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
+  const { refreshProfile } = useProfile();
   const [photos, setPhotos] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
@@ -103,6 +105,8 @@ export default function PhotosScreen() {
         'onboarding_looking_for', 'onboarding_interests',
       ]);
 
+      // Refresh profile in memory so AuthGuard sees the completed profile
+      await refreshProfile();
       router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('Fehler', e?.message ?? 'Profil konnte nicht gespeichert werden.');

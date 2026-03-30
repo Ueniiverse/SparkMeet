@@ -4,8 +4,9 @@ import { BlurView } from "expo-blur";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { COLORS } from "@/constants/colors";
+import { IoniconsName } from "@/lib/types";
 
-function TabBarIcon({ name, color, focused }: { name: any; color: string; focused: boolean }) {
+function TabBarIcon({ name, color, focused }: { name: IoniconsName; color: string; focused: boolean }) {
   return (
     <View style={[iconStyles.wrap, focused && iconStyles.wrapActive]}>
       <Ionicons name={name} size={22} color={color} />

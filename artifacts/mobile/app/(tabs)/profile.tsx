@@ -13,7 +13,7 @@ import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useProfile } from '@/context/ProfileContext';
-import { CATEGORIES } from '@/lib/types';
+import { CATEGORIES, IoniconsName } from '@/lib/types';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -64,11 +64,11 @@ export default function ProfileScreen() {
   const eventsJoined = profile?.events_joined?.length ?? 0;
   const topOffset = insets.top + (Platform.OS === 'web' ? 67 : 0);
 
-  const stats = [
+  const stats: { label: string; value: string | number; icon: IoniconsName; color: string }[] = [
     { label: 'Events', value: eventsJoined, icon: 'calendar', color: COLORS.primary },
     { label: 'Matches', value: matchCount, icon: 'heart', color: '#FF6B8A' },
     { label: 'Streak', value: streak > 0 ? `${streak}W` : '—', icon: 'flame', color: COLORS.gold },
-  ] as const;
+  ];
 
   return (
     <ScrollView
@@ -128,7 +128,7 @@ export default function ProfileScreen() {
         {stats.map((s, i) => (
           <View key={i} style={styles.statCard}>
             <View style={[styles.statIconWrap, { backgroundColor: s.color + '22' }]}>
-              <Ionicons name={s.icon as any} size={16} color={s.color} />
+              <Ionicons name={s.icon} size={16} color={s.color} />
             </View>
             <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
             <Text style={styles.statLabel}>{s.label}</Text>
@@ -181,15 +181,17 @@ export default function ProfileScreen() {
       )}
 
       <View style={styles.menuSection}>
-        {[
-          { icon: 'create-outline', label: 'Profil bearbeiten', action: () => router.push('/edit-profile'), color: COLORS.text },
-          { icon: 'shield-checkmark-outline', label: 'Datenschutz', action: () => {}, color: COLORS.text },
-          { icon: 'help-circle-outline', label: 'Hilfe & Support', action: () => {}, color: COLORS.text },
-        ].map((item, i, arr) => (
+        {(
+          [
+            { icon: 'create-outline' as IoniconsName, label: 'Profil bearbeiten', action: () => router.push('/edit-profile'), color: COLORS.text },
+            { icon: 'shield-checkmark-outline' as IoniconsName, label: 'Datenschutz', action: () => {}, color: COLORS.text },
+            { icon: 'help-circle-outline' as IoniconsName, label: 'Hilfe & Support', action: () => {}, color: COLORS.text },
+          ] as { icon: IoniconsName; label: string; action: () => void; color: string }[]
+        ).map((item, i, arr) => (
           <React.Fragment key={i}>
             <TouchableOpacity style={styles.menuItem} onPress={item.action} activeOpacity={0.75}>
               <View style={[styles.menuIconWrap, { backgroundColor: COLORS.surfaceAlt }]}>
-                <Ionicons name={item.icon as any} size={17} color={item.color} />
+                <Ionicons name={item.icon} size={17} color={item.color} />
               </View>
               <Text style={[styles.menuItemText, { color: item.color }]}>{item.label}</Text>
               <Ionicons name="chevron-forward" size={15} color={COLORS.textDim} />

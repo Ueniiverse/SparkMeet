@@ -95,7 +95,7 @@ export function EventCard({ event, onPress }: EventCardProps) {
           <View style={styles.participantsSection}>
             <View style={styles.progressBarBg}>
               <View style={[styles.progressBarFill, {
-                width: `${fillPercent}%` as any,
+                width: `${fillPercent}%` as `${number}%`,
                 backgroundColor: isFull ? COLORS.error : almostFull ? COLORS.gold : COLORS.primary,
               }]} />
             </View>

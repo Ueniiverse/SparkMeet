@@ -1,0 +1,232 @@
+Build a production-ready dating app called "SparkMeet" for iOS.
+
+CONCEPT:
+People connect through shared activities and local events — 
+no endless swiping. Users join events (cooking class, hiking, 
+game night, yoga, etc.), meet 4-8 other singles there, and 
+can anonymously like each other afterwards. Mutual likes 
+become matches with a private chat.
+
+TECH STACK:
+- React Native + Expo (managed workflow)
+- Supabase for backend (auth, database, storage, realtime)
+- RevenueCat for in-app subscriptions (StoreKit 2)
+- Expo Notifications for push notifications
+- React Navigation (bottom tabs + stack)
+- NativeWind for styling (Tailwind in React Native)
+
+DATABASE SCHEMA (Supabase):
+Table: profiles
+- id (uuid, FK to auth.users)
+- display_name (text)
+- age (int)
+- bio (text, max 300 chars)
+- profile_images (text[], max 6 URLs)
+- interests (text[])
+- city (text)
+- gender (text)
+- looking_for (text)
+- is_pro (boolean, default false)
+- pro_expires_at (timestamptz)
+- notification_token (text)
+- events_joined (text[])
+- created_at (timestamptz)
+- last_active (timestamptz)
+
+Table: events
+- id (uuid)
+- title (text)
+- description (text)
+- category (text) -- Kochen, Wandern, Sport, Kultur, Spieleabend, Café, Konzert, Yoga
+- host_id (uuid, FK profiles)
+- host_name (text)
+- image_url (text)
+- location_name (text)
+- address (text)
+- latitude (float)
+- longitude (float)
+- event_date (timestamptz)
+- duration_minutes (int)
+- max_participants (int, 4-12)
+- current_participants (text[])
+- price (float, default 0)
+- is_premium_only (boolean, default false)
+- status (text) -- upcoming, active, completed, cancelled
+- tags (text[])
+- created_at (timestamptz)
+
+Table: matches
+- id (uuid)
+- user_id_1 (uuid)
+- user_id_2 (uuid)
+- event_id (uuid)
+- status (text) -- pending, matched, declined
+- initiated_by (uuid)
+- last_message (text)
+- last_message_at (timestamptz)
+- created_at (timestamptz)
+
+Table: messages
+- id (uuid)
+- match_id (uuid, FK matches)
+- sender_id (uuid)
+- text (text)
+- is_read (boolean, default false)
+- created_at (timestamptz)
+
+Table: event_likes
+- id (uuid)
+- event_id (uuid)
+- from_user_id (uuid)
+- to_user_id (uuid)
+- created_at (timestamptz)
+
+ROW LEVEL SECURITY (Supabase RLS):
+- Users can only read/write their own profile
+- Events: everyone can read, only host can update/delete
+- Matches: only the two matched users can read
+- Messages: only match participants can read/write
+
+APP SCREENS:
+
+1. SPLASH + ONBOARDING (5 steps):
+   Step 1: Welcome screen with SparkMeet logo
+   Step 2: Name + Age input
+   Step 3: Gender + Looking for
+   Step 4: Interest selection (grid of 8 categories with emojis)
+   Step 5: Photo upload (up to 6 photos, min 1 required)
+   + Location permission request
+
+2. AUTH SCREENS:
+   - Login: Apple Sign-In button (primary) + Email/Password
+   - Register: Email + Password + confirm
+   - Forgot Password screen
+
+3. EVENTS FEED (Tab 1 - Home):
+   - Header: "Events in [City]" + location icon
+   - Horizontal scroll category filter chips
+   - Vertical list of EventCards
+   - Each card shows: cover image, category emoji + name, 
+     title, date, location, spots left badge, 
+     participants count, price (or "Kostenlos")
+   - Premium events show gold "Pro" badge
+   - FAB button to create event (Pro only)
+   - Pull to refresh
+   - Empty state with illustration
+
+4. EVENT DETAIL:
+   - Full-width hero image
+   - Title, category, date+time, duration
+   - MapView showing location
+   - Host info (avatar + name)
+   - Description
+   - Participants list (avatars, max 6 shown)
+   - Tags
+   - Sticky bottom bar: spots left + "Teilnehmen" button
+   - If already joined: "Dabei ✓" state
+   - If full: "Warteliste" option
+   - If past: show post-event like screen
+
+5. POST-EVENT LIKE SCREEN:
+   - Shown 30 min after event ends
+   - Grid of all participants (photo + name)
+   - Tap to like (heart animation)
+   - "Weiter" button to submit
+   - Anonymous until mutual match
+
+6. MATCHES (Tab 2):
+   - List of all mutual matches
+   - Each row: photo, name, last message preview, time
+   - Unread badge
+   - Empty state: "Nach Events liken um Matches zu bekommen"
+   - Tap → opens Chat
+
+7. CHAT:
+   - iMessage-style bubble layout
+   - Send text messages
+   - Show event context at top (which event you met at)
+   - Real-time via Supabase Realtime
+   - Message read receipts
+
+8. PROFILE (Tab 3):
+   - Own profile view with all photos
+   - Edit profile button
+   - Stats: events joined, matches, streak
+   - Premium badge if Pro
+   - Settings gear icon
+
+9. EDIT PROFILE:
+   - Photo grid with add/remove/reorder
+   - Name, age, bio
+   - Interest chips (editable)
+   - City
+   - Save button
+
+10. PREMIUM PAYWALL:
+    - Full-screen modal
+    - Headline: "SparkMeet Pro"
+    - Feature list with icons:
+      ✓ Unlimitierte Events joinen
+      ✓ Events selbst erstellen
+      ✓ Unbegrenzte Matches & Chat
+      ✓ Sehen wer dich liked (Before Match)
+      ✓ 1x Wöchentlicher Boost
+      ✓ Premium-Events zugang
+    - Two product cards:
+      Monthly: 7,99€/Monat
+      Yearly: 49,99€/Jahr (BEST VALUE badge, 48% saved)
+    - "Pro freischalten" CTA button
+    - "Käufe wiederherstellen" link
+    - Legal disclaimer
+
+FREEMIUM LIMITS (enforce in code):
+FREE:
+- Max 3 events joined simultaneously
+- Max 5 matches total
+- Cannot create events
+- Cannot see who liked you before match
+- No boost
+
+PRO (isPro = true AND proExpiresAt > now):
+- Unlimited everything
+- Can create events
+- See likes before match
+- Weekly boost
+- Premium-only events
+
+REVENUE CAT PRODUCTS:
+- Monthly: com.sparkmeet.app.pro.monthly → 7,99€
+- Yearly: com.sparkmeet.app.pro.yearly → 49,99€
+
+DESIGN:
+- Dark mode only
+- Primary color: #7C6FFF (purple)
+- Background: #0A0A0F
+- Surface: #13131A  
+- Text: #F0F0FF
+- Success/Green: #3DFFA0
+- Font: System (SF Pro on iOS)
+- Border radius: 16-20px on cards
+- Smooth animations on all interactions
+- Loading skeletons instead of spinners
+- Haptic feedback on important actions
+- iOS-native feel throughout
+
+NOTIFICATIONS:
+- New match → "🎉 Neues Match! Du und [Name] habt euch gegenseitig geliked!"
+- New message → "[Name]: [preview]"
+- Event reminder → 2h before event
+- Post-event prompt → 30min after event ends
+
+APP STORE METADATA:
+- Bundle ID: com.sparkmeet.app
+- iOS deployment target: 16.0
+- Permissions needed:
+  NSLocationWhenInUseUsageDescription: "SparkMeet zeigt dir Events in deiner Nähe."
+  NSPhotoLibraryUsageDescription: "Um Profilfotos hochzuladen."
+  NSCameraUsageDescription: "Um direkt Fotos aufzunehmen."
+
+Make all screens fully functional with real Supabase 
+integration — no mock data in production code. 
+Include proper error handling, loading states, and 
+empty states on every screen.

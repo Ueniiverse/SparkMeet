@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ScrollView, Alert,
+  KeyboardAvoidingView, Platform, ScrollView, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
@@ -16,10 +17,11 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Fehler', 'Bitte E-Mail und Passwort eingeben.');
+      Alert.alert('Fehlende Felder', 'Bitte E-Mail und Passwort eingeben.');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -38,138 +40,171 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 20 }]}
-        keyboardShouldPersistTaps="handled"
+    <View style={styles.root}>
+      <LinearGradient
+        colors={['rgba(124,111,255,0.18)', 'rgba(124,111,255,0.05)', 'transparent']}
+        locations={[0, 0.4, 1]}
+        style={styles.topGlow}
+      />
+
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.logoContainer}>
-          <View style={styles.logoRing}>
-            <Ionicons name="flash" size={36} color={COLORS.primary} />
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.logoSection}>
+            <LinearGradient
+              colors={[COLORS.primary + '40', COLORS.primaryDark + '20']}
+              style={styles.logoRing}
+            >
+              <View style={styles.logoInner}>
+                <Ionicons name="flash" size={34} color={COLORS.primary} />
+              </View>
+            </LinearGradient>
+            <Text style={styles.appName}>SparkMeet</Text>
+            <Text style={styles.tagline}>Verbinde dich über gemeinsame Erlebnisse</Text>
           </View>
-          <Text style={styles.appName}>SparkMeet</Text>
-          <Text style={styles.subtitle}>Verbinde dich über gemeinsame Erlebnisse</Text>
-        </View>
 
-        <TouchableOpacity style={styles.appleButton} onPress={handleAppleSignIn} activeOpacity={0.85}>
-          <Ionicons name="logo-apple" size={20} color={COLORS.text} />
-          <Text style={styles.appleButtonText}>Mit Apple anmelden</Text>
-        </TouchableOpacity>
+          <TouchableOpacity style={styles.appleBtn} onPress={handleAppleSignIn} activeOpacity={0.85}>
+            <Ionicons name="logo-apple" size={20} color={COLORS.text} />
+            <Text style={styles.appleBtnText}>Mit Apple anmelden</Text>
+          </TouchableOpacity>
 
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>oder per E-Mail</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="mail-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="E-Mail"
-              placeholderTextColor={COLORS.textDim}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              autoComplete="email"
-            />
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>oder per E-Mail</Text>
+            <View style={styles.dividerLine} />
           </View>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="lock-closed-outline" size={18} color={COLORS.textMuted} style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Passwort"
-              placeholderTextColor={COLORS.textDim}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPw}
-              autoComplete="current-password"
-            />
-            <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeButton}>
-              <Ionicons name={showPw ? 'eye-off-outline' : 'eye-outline'} size={18} color={COLORS.textMuted} />
+
+          <View style={styles.fields}>
+            <View style={[styles.field, focusedField === 'email' && styles.fieldFocused]}>
+              <Ionicons name="mail-outline" size={18} color={focusedField === 'email' ? COLORS.primary : COLORS.textMuted} />
+              <TextInput
+                style={styles.input}
+                placeholder="E-Mail"
+                placeholderTextColor={COLORS.textDim}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+                onFocus={() => setFocusedField('email')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+
+            <View style={[styles.field, focusedField === 'password' && styles.fieldFocused]}>
+              <Ionicons name="lock-closed-outline" size={18} color={focusedField === 'password' ? COLORS.primary : COLORS.textMuted} />
+              <TextInput
+                style={styles.input}
+                placeholder="Passwort"
+                placeholderTextColor={COLORS.textDim}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPw}
+                autoComplete="current-password"
+                onFocus={() => setFocusedField('password')}
+                onBlur={() => setFocusedField(null)}
+              />
+              <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn}>
+                <Ionicons
+                  name={showPw ? 'eye-off-outline' : 'eye-outline'}
+                  size={18}
+                  color={COLORS.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.forgotBtn}
+            onPress={() => router.push('/(auth)/forgot-password')}
+          >
+            <Text style={styles.forgotText}>Passwort vergessen?</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.loginBtn, loading && { opacity: 0.7 }]}
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.88}
+          >
+            <LinearGradient
+              colors={[COLORS.primary, COLORS.primaryDark]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.loginBtnGradient}
+            >
+              {loading ? (
+                <ActivityIndicator color={COLORS.white} size="small" />
+              ) : (
+                <Text style={styles.loginBtnText}>Anmelden</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <View style={styles.registerRow}>
+            <Text style={styles.registerText}>Noch kein Konto? </Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
+              <Text style={styles.registerLink}>Registrieren</Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        <TouchableOpacity
-          style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-          onPress={handleLogin}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <View style={styles.loadingDots}>
-              <Text style={styles.loginButtonText}>...</Text>
-            </View>
-          ) : (
-            <Text style={styles.loginButtonText}>Anmelden</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.forgotButton}
-          onPress={() => router.push('/(auth)/forgot-password')}
-        >
-          <Text style={styles.forgotText}>Passwort vergessen?</Text>
-        </TouchableOpacity>
-
-        <View style={styles.registerRow}>
-          <Text style={styles.registerText}>Noch kein Konto? </Text>
-          <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-            <Text style={styles.registerLink}>Registrieren</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { paddingHorizontal: 24, flexGrow: 1 },
-  logoContainer: { alignItems: 'center', marginBottom: 40 },
-  logoRing: {
-    width: 80, height: 80, borderRadius: 24,
-    backgroundColor: COLORS.primaryGlow,
-    borderWidth: 1.5, borderColor: COLORS.primary,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
+  root: { flex: 1, backgroundColor: COLORS.background },
+  flex: { flex: 1 },
+  topGlow: {
+    position: 'absolute', top: 0, left: -60, right: -60,
+    height: 380, borderBottomLeftRadius: 200, borderBottomRightRadius: 200,
   },
-  appName: { color: COLORS.text, fontSize: 32, fontFamily: 'Inter_700Bold', marginBottom: 6 },
-  subtitle: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-  appleButton: {
+  scroll: { paddingHorizontal: 28, flexGrow: 1 },
+  logoSection: { alignItems: 'center', marginBottom: 44 },
+  logoRing: {
+    width: 88, height: 88, borderRadius: 26,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 18,
+  },
+  logoInner: {
+    width: 72, height: 72, borderRadius: 20,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5, borderColor: COLORS.primary + '60',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  appName: { color: COLORS.text, fontSize: 34, fontFamily: 'Inter_700Bold', letterSpacing: -0.5, marginBottom: 8 },
+  tagline: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 },
+  appleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.surfaceBorder,
-    borderRadius: 16, height: 54, marginBottom: 20,
+    borderRadius: 18, height: 56, marginBottom: 22,
   },
-  appleButtonText: { color: COLORS.text, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  appleBtnText: { color: COLORS.text, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 22 },
   dividerLine: { flex: 1, height: 1, backgroundColor: COLORS.surfaceBorder },
-  dividerText: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular' },
-  inputGroup: { gap: 12, marginBottom: 20 },
-  inputWrapper: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.surfaceBorder,
-    borderRadius: 16, height: 54, paddingHorizontal: 16,
-  },
-  inputIcon: { marginRight: 10 },
+  dividerText: { color: COLORS.textDim, fontSize: 13, fontFamily: 'Inter_400Regular' },
+  fields: { gap: 12, marginBottom: 14 },
+  field: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: COLORS.surface, borderWidth: 1.5, borderColor: COLORS.surfaceBorder,
+    borderRadius: 18, height: 58, paddingHorizontal: 18,
+    transition: 'border-color 0.2s',
+  } as any,
+  fieldFocused: { borderColor: COLORS.primary },
   input: { flex: 1, color: COLORS.text, fontSize: 15, fontFamily: 'Inter_400Regular' },
-  eyeButton: { padding: 4 },
-  loginButton: {
-    backgroundColor: COLORS.primary, borderRadius: 16, height: 54,
-    alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-  },
-  loginButtonDisabled: { opacity: 0.6 },
-  loginButtonText: { color: COLORS.white, fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  loadingDots: { alignItems: 'center', justifyContent: 'center' },
-  forgotButton: { alignItems: 'center', marginBottom: 24 },
-  forgotText: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  eyeBtn: { padding: 4 },
+  forgotBtn: { alignSelf: 'flex-end', marginBottom: 22 },
+  forgotText: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular' },
+  loginBtn: { borderRadius: 18, overflow: 'hidden', marginBottom: 28 },
+  loginBtnGradient: { height: 58, alignItems: 'center', justifyContent: 'center' },
+  loginBtnText: { color: COLORS.white, fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
   registerRow: { flexDirection: 'row', justifyContent: 'center' },
   registerText: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  registerLink: { color: COLORS.primary, fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  registerLink: { color: COLORS.primary, fontSize: 14, fontFamily: 'Inter_700Bold' },
 });

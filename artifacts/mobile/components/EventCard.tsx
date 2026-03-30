@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Event, CATEGORIES } from '@/lib/types';
 import { COLORS } from '@/constants/colors';
 
@@ -11,68 +12,99 @@ interface EventCardProps {
 
 export function EventCard({ event, onPress }: EventCardProps) {
   const spotsLeft = event.max_participants - (event.current_participants?.length ?? 0);
+  const filled = event.current_participants?.length ?? 0;
   const categoryInfo = CATEGORIES.find(c => c.key === event.category);
   const eventDate = new Date(event.event_date);
-  const isToday = new Date().toDateString() === eventDate.toDateString();
+  const now = new Date();
+  const isToday = now.toDateString() === eventDate.toDateString();
+  const isTomorrow = new Date(now.getTime() + 86400000).toDateString() === eventDate.toDateString();
 
-  const dateStr = isToday
-    ? `Heute, ${eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`
-    : eventDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' }) +
-      `, ${eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr`;
+  const dayLabel = isToday
+    ? 'Heute'
+    : isTomorrow
+    ? 'Morgen'
+    : eventDate.toLocaleDateString('de-DE', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  const timeStr = eventDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  const fillPercent = event.max_participants > 0 ? (filled / event.max_participants) * 100 : 0;
+  const almostFull = spotsLeft <= 2 && spotsLeft > 0;
+  const isFull = spotsLeft <= 0;
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.88}>
       <View style={styles.imageContainer}>
         {event.image_url ? (
-          <Image source={{ uri: event.image_url }} style={styles.image} />
+          <Image source={{ uri: event.image_url }} style={styles.image} resizeMode="cover" />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <Ionicons name={categoryInfo?.icon ?? 'calendar-outline'} size={40} color={COLORS.primary} />
+            <Ionicons name={categoryInfo?.icon ?? 'calendar-outline'} size={48} color={COLORS.primary} />
           </View>
         )}
-        {event.is_premium_only && (
-          <View style={styles.proBadge}>
-            <Text style={styles.proBadgeText}>PRO</Text>
+
+        <LinearGradient
+          colors={['transparent', 'rgba(10,10,15,0.6)', 'rgba(10,10,15,0.97)']}
+          locations={[0.2, 0.55, 1]}
+          style={styles.gradient}
+        />
+
+        <View style={styles.topBadges}>
+          <View style={styles.categoryBadge}>
+            <Ionicons name={categoryInfo?.icon ?? 'calendar-outline'} size={12} color={COLORS.primary} />
+            <Text style={styles.categoryBadgeText}>{event.category}</Text>
           </View>
-        )}
-        <View style={styles.spotsBadge}>
-          <Ionicons name="people-outline" size={12} color={spotsLeft <= 2 ? COLORS.error : COLORS.success} />
-          <Text style={[styles.spotsText, { color: spotsLeft <= 2 ? COLORS.error : COLORS.success }]}>
-            {spotsLeft} frei
-          </Text>
+          {event.is_premium_only && (
+            <View style={styles.proBadge}>
+              <Ionicons name="flash" size={10} color="#000" />
+              <Text style={styles.proBadgeText}>PRO</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.imageBottom}>
+          <Text style={styles.imageTitle} numberOfLines={2}>{event.title}</Text>
+          <View style={styles.imageMeta}>
+            <View style={styles.dateChip}>
+              <Ionicons name="time-outline" size={12} color={COLORS.text} />
+              <Text style={styles.dateChipText}>{dayLabel}, {timeStr}</Text>
+            </View>
+            {(almostFull || isFull) && (
+              <View style={[styles.urgencyChip, { backgroundColor: isFull ? COLORS.error + '22' : COLORS.gold + '22' }]}>
+                <Ionicons
+                  name={isFull ? 'close-circle' : 'flame'}
+                  size={11}
+                  color={isFull ? COLORS.error : COLORS.gold}
+                />
+                <Text style={[styles.urgencyText, { color: isFull ? COLORS.error : COLORS.gold }]}>
+                  {isFull ? 'Ausgebucht' : `Nur ${spotsLeft} frei`}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
       <View style={styles.content}>
-        <View style={styles.categoryRow}>
-          <View style={styles.categoryChip}>
-            <Ionicons name={categoryInfo?.icon ?? 'calendar-outline'} size={12} color={COLORS.primary} />
-            <Text style={styles.categoryText}>{event.category}</Text>
-          </View>
+        <View style={styles.locationRow}>
+          <Ionicons name="location-outline" size={13} color={COLORS.textMuted} />
+          <Text style={styles.locationText} numberOfLines={1}>
+            {event.location_name ?? 'Ort wird bekannt gegeben'}
+          </Text>
         </View>
-
-        <Text style={styles.title} numberOfLines={2}>{event.title}</Text>
-
-        <View style={styles.metaRow}>
-          <Ionicons name="time-outline" size={13} color={COLORS.textMuted} />
-          <Text style={styles.metaText}>{dateStr}</Text>
-        </View>
-        {event.location_name && (
-          <View style={styles.metaRow}>
-            <Ionicons name="location-outline" size={13} color={COLORS.textMuted} />
-            <Text style={styles.metaText} numberOfLines={1}>{event.location_name}</Text>
-          </View>
-        )}
 
         <View style={styles.footer}>
-          <View style={styles.participantsRow}>
-            <Ionicons name="people-outline" size={13} color={COLORS.textMuted} />
+          <View style={styles.participantsSection}>
+            <View style={styles.progressBarBg}>
+              <View style={[styles.progressBarFill, {
+                width: `${fillPercent}%` as any,
+                backgroundColor: isFull ? COLORS.error : almostFull ? COLORS.gold : COLORS.primary,
+              }]} />
+            </View>
             <Text style={styles.participantsText}>
-              {event.current_participants?.length ?? 0}/{event.max_participants}
+              {filled}/{event.max_participants} Teilnehmer
             </Text>
           </View>
-          <Text style={styles.price}>
-            {event.price === 0 ? 'Kostenlos' : `${event.price.toFixed(2)} €`}
+          <Text style={[styles.price, event.price === 0 && styles.priceFree]}>
+            {event.price === 0 ? 'Kostenlos' : `${event.price.toFixed(0)} €`}
           </Text>
         </View>
       </View>
@@ -83,14 +115,14 @@ export function EventCard({ event, onPress }: EventCardProps) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: 20,
+    borderRadius: 22,
     marginBottom: 16,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: COLORS.surfaceBorder,
   },
   imageContainer: {
-    height: 180,
+    height: 220,
     position: 'relative',
   },
   image: {
@@ -104,14 +136,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  proBadge: {
+  gradient: {
     position: 'absolute',
-    top: 12,
-    left: 12,
+    left: 0, right: 0, bottom: 0,
+    height: '100%',
+  },
+  topBadges: {
+    position: 'absolute',
+    top: 12, left: 12,
+    flexDirection: 'row', gap: 6,
+  },
+  categoryBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: 'rgba(10,10,15,0.72)',
+    paddingHorizontal: 9, paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1, borderColor: 'rgba(124,111,255,0.3)',
+  },
+  categoryBadgeText: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  proBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: COLORS.gold,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 20,
   },
   proBadgeText: {
     color: '#000',
@@ -119,84 +170,68 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     letterSpacing: 0.5,
   },
-  spotsBadge: {
+  imageBottom: {
     position: 'absolute',
-    top: 12,
-    right: 12,
-    backgroundColor: 'rgba(10,10,15,0.8)',
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  spotsText: {
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  content: {
+    bottom: 0, left: 0, right: 0,
     padding: 14,
   },
-  categoryRow: {
-    marginBottom: 8,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.primaryGlow,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  categoryText: {
-    color: COLORS.primary,
-    fontSize: 11,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  title: {
+  imageTitle: {
     color: COLORS.text,
-    fontSize: 16,
-    fontFamily: 'Inter_600SemiBold',
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold',
+    lineHeight: 24,
     marginBottom: 8,
-    lineHeight: 22,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginBottom: 4,
+  imageMeta: {
+    flexDirection: 'row', gap: 8, flexWrap: 'wrap',
   },
-  metaText: {
-    color: COLORS.textMuted,
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
-    flex: 1,
+  dateChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: 9, paddingVertical: 4,
+    borderRadius: 8,
+  },
+  dateChipText: {
+    color: COLORS.text, fontSize: 12, fontFamily: 'Inter_500Medium',
+  },
+  urgencyChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8,
+  },
+  urgencyText: {
+    fontSize: 11, fontFamily: 'Inter_600SemiBold',
+  },
+  content: {
+    paddingHorizontal: 14, paddingTop: 10, paddingBottom: 12,
+  },
+  locationRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10,
+  },
+  locationText: {
+    color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1,
   },
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.surfaceBorder,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  participantsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  participantsSection: {
+    flex: 1, gap: 5, marginRight: 12,
+  },
+  progressBarBg: {
+    height: 4, borderRadius: 2, backgroundColor: COLORS.surfaceAlt, overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%', borderRadius: 2,
   },
   participantsText: {
-    color: COLORS.textMuted,
-    fontSize: 13,
-    fontFamily: 'Inter_400Regular',
+    color: COLORS.textMuted, fontSize: 12, fontFamily: 'Inter_400Regular',
   },
   price: {
+    color: COLORS.text, fontSize: 14, fontFamily: 'Inter_700Bold',
+    backgroundColor: COLORS.surfaceAlt,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8,
+  },
+  priceFree: {
     color: COLORS.success,
-    fontSize: 13,
-    fontFamily: 'Inter_600SemiBold',
+    backgroundColor: COLORS.successDim,
   },
 });

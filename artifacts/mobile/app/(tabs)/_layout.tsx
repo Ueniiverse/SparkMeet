@@ -2,8 +2,26 @@ import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import React from "react";
-import { Platform, StyleSheet } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { COLORS } from "@/constants/colors";
+
+function TabBarIcon({ name, color, focused }: { name: any; color: string; focused: boolean }) {
+  return (
+    <View style={[iconStyles.wrap, focused && iconStyles.wrapActive]}>
+      <Ionicons name={name} size={22} color={color} />
+    </View>
+  );
+}
+
+const iconStyles = StyleSheet.create({
+  wrap: {
+    width: 40, height: 40, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  wrapActive: {
+    backgroundColor: COLORS.primaryGlow,
+  },
+});
 
 export default function TabLayout() {
   return (
@@ -14,20 +32,24 @@ export default function TabLayout() {
         tabBarInactiveTintColor: COLORS.textDim,
         tabBarStyle: {
           position: "absolute",
-          backgroundColor: Platform.OS === "ios" ? "transparent" : COLORS.surface,
+          backgroundColor: Platform.OS === "ios" ? "transparent" : COLORS.surface + 'F0',
           borderTopWidth: 1,
           borderTopColor: COLORS.surfaceBorder,
           elevation: 0,
-          height: Platform.OS === "web" ? 84 : undefined,
+          height: Platform.OS === "web" ? 84 : 62,
+          paddingTop: 4,
         },
         tabBarBackground: () =>
           Platform.OS === "ios" ? (
-            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+            <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
           ) : null,
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
-          fontSize: 11,
-          marginBottom: Platform.OS === "web" ? 0 : 2,
+          fontSize: 10,
+          marginBottom: Platform.OS === "web" ? 0 : 6,
+        },
+        tabBarItemStyle: {
+          paddingTop: 2,
         },
       }}
     >
@@ -36,7 +58,7 @@ export default function TabLayout() {
         options={{
           title: "Events",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "calendar" : "calendar-outline"} size={24} color={color} />
+            <TabBarIcon name={focused ? "calendar" : "calendar-outline"} color={color} focused={focused} />
           ),
         }}
       />
@@ -45,7 +67,7 @@ export default function TabLayout() {
         options={{
           title: "Matches",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "heart" : "heart-outline"} size={24} color={color} />
+            <TabBarIcon name={focused ? "heart" : "heart-outline"} color={color} focused={focused} />
           ),
         }}
       />
@@ -54,7 +76,7 @@ export default function TabLayout() {
         options={{
           title: "Profil",
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? "person" : "person-outline"} size={24} color={color} />
+            <TabBarIcon name={focused ? "person" : "person-outline"} color={color} focused={focused} />
           ),
         }}
       />

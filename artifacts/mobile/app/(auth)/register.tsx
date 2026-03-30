@@ -33,9 +33,15 @@ export default function RegisterScreen() {
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setLoading(true);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
-    if (error) Alert.alert('Registrierung fehlgeschlagen', error.message);
+    if (error) {
+      Alert.alert('Registrierung fehlgeschlagen', error.message);
+    } else if (data.user) {
+      // Create minimal profile so ProfileContext can find it immediately
+      await supabase.from('profiles').upsert({ id: data.user.id }, { onConflict: 'id' });
+      router.replace('/');
+    }
   };
 
   return (

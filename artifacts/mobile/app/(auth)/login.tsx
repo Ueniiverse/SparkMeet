@@ -26,7 +26,11 @@ export default function LoginScreen() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
-    if (error) Alert.alert('Anmeldung fehlgeschlagen', error.message);
+    if (error) {
+      Alert.alert('Anmeldung fehlgeschlagen', error.message);
+    } else {
+      router.replace('/');
+    }
   };
 
   const handleAppleSignIn = () => {

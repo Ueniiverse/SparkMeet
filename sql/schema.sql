@@ -279,6 +279,75 @@ BEGIN
 END;
 $$;
 
+-- create_match: Atomically check mutual like + free-tier match cap + create match
+-- Returns the new match id, or NULL if match already exists
+CREATE OR REPLACE FUNCTION create_match(p_event_id UUID, p_other_user_id UUID)
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+  v_match_id UUID;
+  v_match_count INT;
+  v_is_pro BOOLEAN;
+  v_pro_expires TIMESTAMPTZ;
+  v_mutual BOOLEAN;
+BEGIN
+  -- Verify mutual event_like exists
+  SELECT EXISTS(
+    SELECT 1 FROM event_likes el1
+    JOIN event_likes el2
+      ON el1.event_id = el2.event_id
+      AND el1.from_user_id = el2.to_user_id
+      AND el1.to_user_id = el2.from_user_id
+    WHERE el1.event_id = p_event_id
+      AND el1.from_user_id = auth.uid()
+      AND el1.to_user_id = p_other_user_id
+  ) INTO v_mutual;
+
+  IF NOT v_mutual THEN
+    RAISE EXCEPTION 'NO_MUTUAL_LIKE';
+  END IF;
+
+  -- Check if match already exists
+  SELECT id INTO v_match_id FROM matches
+  WHERE event_id = p_event_id
+    AND (
+      (user_id_1 = auth.uid() AND user_id_2 = p_other_user_id) OR
+      (user_id_1 = p_other_user_id AND user_id_2 = auth.uid())
+    )
+  LIMIT 1;
+
+  IF v_match_id IS NOT NULL THEN
+    RETURN v_match_id; -- Already exists
+  END IF;
+
+  -- Load caller's Pro status
+  SELECT is_pro, pro_expires_at INTO v_is_pro, v_pro_expires
+  FROM profiles WHERE id = auth.uid();
+
+  IF v_pro_expires IS NOT NULL AND v_pro_expires < NOW() THEN
+    v_is_pro := FALSE;
+  END IF;
+
+  -- Enforce free-tier match cap (5 matches max)
+  IF NOT COALESCE(v_is_pro, FALSE) THEN
+    SELECT COUNT(*) INTO v_match_count FROM matches
+    WHERE user_id_1 = auth.uid() OR user_id_2 = auth.uid();
+
+    IF v_match_count >= 5 THEN
+      RAISE EXCEPTION 'FREE_LIMIT_MATCHES';
+    END IF;
+  END IF;
+
+  -- Create the match
+  INSERT INTO matches (user_id_1, user_id_2, event_id, status, initiated_by)
+  VALUES (auth.uid(), p_other_user_id, p_event_id, 'matched', auth.uid())
+  RETURNING id INTO v_match_id;
+
+  RETURN v_match_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION create_match(UUID, UUID) TO authenticated;
+
 -- Grant execute to authenticated users
 GRANT EXECUTE ON FUNCTION join_event(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION leave_event(UUID) TO authenticated;

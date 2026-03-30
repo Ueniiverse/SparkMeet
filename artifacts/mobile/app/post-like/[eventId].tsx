@@ -19,7 +19,7 @@ export default function PostLikeScreen() {
   const { eventId } = useLocalSearchParams<{ eventId: string }>();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { canCreateMatch } = useProfile();
+  useProfile();
   const queryClient = useQueryClient();
   const [likedIds, setLikedIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -62,32 +62,20 @@ export default function PostLikeScreen() {
       if (inserts.length > 0) {
         await supabase.from('event_likes').upsert(inserts, { onConflict: 'event_id,from_user_id,to_user_id' });
       }
-      // Check for mutual likes and create matches
+      // Create matches via SECURITY DEFINER RPC (enforces mutual like + free-tier cap)
       for (const toId of likedIds) {
-        const { data: mutualLike } = await supabase.from('event_likes')
-          .select('*')
-          .eq('event_id', eventId)
-          .eq('from_user_id', toId)
-          .eq('to_user_id', user.id)
-          .single();
-
-        if (mutualLike) {
-          const existingMatch = await supabase.from('matches').select('id')
-            .or(`and(user_id_1.eq.${user.id},user_id_2.eq.${toId}),and(user_id_1.eq.${toId},user_id_2.eq.${user.id})`)
-            .maybeSingle();
-
-          if (!existingMatch.data) {
-            if (!canCreateMatch) {
-              router.push('/paywall');
-              return;
-            }
-            await supabase.from('matches').insert({
-              user_id_1: user.id,
-              user_id_2: toId,
-              event_id: eventId,
-              status: 'matched',
-              initiated_by: user.id,
-            });
+        const { error: matchError } = await supabase.rpc('create_match', {
+          p_event_id: eventId,
+          p_other_user_id: toId,
+        });
+        if (matchError) {
+          if (matchError.message.includes('FREE_LIMIT_MATCHES')) {
+            router.push('/paywall');
+            return;
+          }
+          // NO_MUTUAL_LIKE is expected when the other user hasn't liked back yet — ignore
+          if (!matchError.message.includes('NO_MUTUAL_LIKE')) {
+            throw matchError;
           }
         }
       }

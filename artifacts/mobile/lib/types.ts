@@ -1,3 +1,8 @@
+import type { ComponentProps } from 'react';
+import type { Ionicons } from '@expo/vector-icons';
+
+export type IoniconsName = ComponentProps<typeof Ionicons>['name'];
+
 export interface Profile {
   id: string;
   display_name: string | null;
@@ -71,7 +76,13 @@ export interface EventLike {
   created_at: string;
 }
 
-export const CATEGORIES = [
+export interface Category {
+  key: string;
+  icon: IoniconsName;
+  label: string;
+}
+
+export const CATEGORIES: Category[] = [
   { key: 'Kochen', icon: 'restaurant-outline', label: 'Kochen' },
   { key: 'Wandern', icon: 'trail-sign-outline', label: 'Wandern' },
   { key: 'Sport', icon: 'football-outline', label: 'Sport' },
@@ -80,9 +91,9 @@ export const CATEGORIES = [
   { key: 'Café', icon: 'cafe-outline', label: 'Café' },
   { key: 'Konzert', icon: 'musical-notes-outline', label: 'Konzert' },
   { key: 'Yoga', icon: 'body-outline', label: 'Yoga' },
-] as const;
+];
 
-export type CategoryKey = typeof CATEGORIES[number]['key'];
+export type CategoryKey = Category['key'];
 
 export const FREE_MAX_EVENTS = 3;
 export const FREE_MAX_MATCHES = 5;

@@ -8,8 +8,11 @@ import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useProfile } from '@/context/ProfileContext';
+import type { IoniconsName } from '@/lib/types';
 
-const FEATURES = [
+interface Feature { icon: IoniconsName; text: string; }
+
+const FEATURES: Feature[] = [
   { icon: 'calendar-outline', text: 'Unlimitierte Events joinen' },
   { icon: 'sparkles-outline', text: 'Events selbst erstellen' },
   { icon: 'heart-outline', text: 'Unbegrenzte Matches & Chat' },
@@ -78,7 +81,7 @@ export default function PaywallScreen() {
           {FEATURES.map((f, i) => (
             <View key={i} style={styles.featureRow}>
               <View style={styles.featureIcon}>
-                <Ionicons name={f.icon as any} size={18} color={COLORS.primary} />
+                <Ionicons name={f.icon} size={18} color={COLORS.primary} />
               </View>
               <Text style={styles.featureText}>{f.text}</Text>
               <Ionicons name="checkmark" size={16} color={COLORS.success} />

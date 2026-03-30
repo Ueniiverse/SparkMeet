@@ -195,7 +195,7 @@ export default function EditProfileScreen() {
                 onPress={() => toggleInterest(cat.key)}
                 activeOpacity={0.8}
               >
-                <Ionicons name={cat.icon as any} size={14} color={selected ? COLORS.primary : COLORS.textMuted} />
+                <Ionicons name={cat.icon} size={14} color={selected ? COLORS.primary : COLORS.textMuted} />
                 <Text style={[styles.interestChipText, selected && styles.interestChipTextSelected]}>
                   {cat.label}
                 </Text>

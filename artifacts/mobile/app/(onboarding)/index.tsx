@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { IoniconsName } from '@/lib/types';
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
@@ -24,15 +25,15 @@ export default function WelcomeScreen() {
         <Text style={styles.tagline}>Dating durch echte Erlebnisse</Text>
 
         <View style={styles.features}>
-          {[
-            { icon: 'calendar-outline', text: 'Joinen lokale Events' },
-            { icon: 'people-outline', text: 'Treffe 4-8 Singles' },
-            { icon: 'heart-outline', text: 'Matche anonym danach' },
-            { icon: 'chatbubbles-outline', text: 'Chatte mit Matches' },
-          ].map((f, i) => (
+          {([
+            { icon: 'calendar-outline' as IoniconsName, text: 'Joinen lokale Events' },
+            { icon: 'people-outline' as IoniconsName, text: 'Treffe 4-8 Singles' },
+            { icon: 'heart-outline' as IoniconsName, text: 'Matche anonym danach' },
+            { icon: 'chatbubbles-outline' as IoniconsName, text: 'Chatte mit Matches' },
+          ]).map((f, i) => (
             <View key={i} style={styles.featureRow}>
               <View style={styles.featureIcon}>
-                <Ionicons name={f.icon as any} size={20} color={COLORS.primary} />
+                <Ionicons name={f.icon} size={20} color={COLORS.primary} />
               </View>
               <Text style={styles.featureText}>{f.text}</Text>
             </View>

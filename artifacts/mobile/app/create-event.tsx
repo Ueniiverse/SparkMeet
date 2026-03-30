@@ -1,18 +1,26 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
-  Alert, ActivityIndicator, Platform,
+  Alert, ActivityIndicator, Platform, KeyboardTypeOptions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { supabase } from '@/lib/supabase';
-import { CATEGORIES } from '@/lib/types';
+import { CATEGORIES, type IoniconsName } from '@/lib/types';
 import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useProfile } from '@/context/ProfileContext';
 import { useQueryClient } from '@tanstack/react-query';
+
+interface FormField {
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  icon: IoniconsName;
+  keyboardType?: KeyboardTypeOptions;
+}
 
 export default function CreateEventScreen() {
   const insets = useSafeAreaInsets();
@@ -117,7 +125,7 @@ export default function CreateEventScreen() {
                 onPress={() => { Haptics.selectionAsync(); setCategory(cat.key); }}
                 activeOpacity={0.8}
               >
-                <Ionicons name={cat.icon as any} size={14} color={category === cat.key ? COLORS.white : COLORS.textMuted} />
+                <Ionicons name={cat.icon} size={14} color={category === cat.key ? COLORS.white : COLORS.textMuted} />
                 <Text style={[styles.catChipText, category === cat.key && styles.catChipTextActive]}>{cat.label}</Text>
               </TouchableOpacity>
             ))}
@@ -126,15 +134,15 @@ export default function CreateEventScreen() {
 
         <Text style={styles.sectionTitle}>Details</Text>
         <View style={styles.inputGroup}>
-          {[
-            { placeholder: 'Titel *', value: title, onChange: setTitle, icon: 'pencil-outline' as const },
-            { placeholder: 'Ort (z.B. Kochschule Mitte)', value: locationName, onChange: setLocationName, icon: 'location-outline' as const },
-            { placeholder: 'Adresse', value: address, onChange: setAddress, icon: 'map-outline' as const },
-            { placeholder: 'Datum (TT.MM.JJJJ)', value: date, onChange: setDate, icon: 'calendar-outline' as const },
-            { placeholder: 'Uhrzeit (HH:MM)', value: time, onChange: setTime, icon: 'time-outline' as const },
-            { placeholder: 'Max. Teilnehmer (4-12)', value: maxParticipants, onChange: setMaxParticipants, icon: 'people-outline' as const, keyboardType: 'number-pad' as const },
-            { placeholder: 'Preis in € (0 = kostenlos)', value: price, onChange: setPrice, icon: 'cash-outline' as const, keyboardType: 'decimal-pad' as const },
-          ].map((field, i) => (
+          {([
+            { placeholder: 'Titel *', value: title, onChange: setTitle, icon: 'pencil-outline' },
+            { placeholder: 'Ort (z.B. Kochschule Mitte)', value: locationName, onChange: setLocationName, icon: 'location-outline' },
+            { placeholder: 'Adresse', value: address, onChange: setAddress, icon: 'map-outline' },
+            { placeholder: 'Datum (TT.MM.JJJJ)', value: date, onChange: setDate, icon: 'calendar-outline' },
+            { placeholder: 'Uhrzeit (HH:MM)', value: time, onChange: setTime, icon: 'time-outline' },
+            { placeholder: 'Max. Teilnehmer (4-12)', value: maxParticipants, onChange: setMaxParticipants, icon: 'people-outline', keyboardType: 'number-pad' as KeyboardTypeOptions },
+            { placeholder: 'Preis in € (0 = kostenlos)', value: price, onChange: setPrice, icon: 'cash-outline', keyboardType: 'decimal-pad' as KeyboardTypeOptions },
+          ] as FormField[]).map((field, i) => (
             <View key={i} style={styles.inputWrapper}>
               <Ionicons name={field.icon} size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
               <TextInput
@@ -143,7 +151,7 @@ export default function CreateEventScreen() {
                 placeholderTextColor={COLORS.textDim}
                 value={field.value}
                 onChangeText={field.onChange}
-                keyboardType={(field as any).keyboardType ?? 'default'}
+                keyboardType={field.keyboardType ?? 'default'}
               />
             </View>
           ))}

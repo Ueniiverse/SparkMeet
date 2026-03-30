@@ -82,7 +82,7 @@ export default function EventsFeedScreen() {
             activeOpacity={0.8}
           >
             <Ionicons
-              name={cat.icon as any}
+              name={cat.icon}
               size={14}
               color={activeCategory === cat.key ? COLORS.white : COLORS.textMuted}
             />

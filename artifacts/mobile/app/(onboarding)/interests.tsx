@@ -51,7 +51,7 @@ export default function InterestsScreen() {
               activeOpacity={0.8}
             >
               <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
-                <Ionicons name={cat.icon as any} size={22} color={isSelected ? COLORS.primary : COLORS.textMuted} />
+                <Ionicons name={cat.icon} size={22} color={isSelected ? COLORS.primary : COLORS.textMuted} />
               </View>
               <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>{cat.label}</Text>
               {isSelected && (

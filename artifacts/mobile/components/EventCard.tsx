@@ -27,7 +27,7 @@ export function EventCard({ event, onPress }: EventCardProps) {
           <Image source={{ uri: event.image_url }} style={styles.image} />
         ) : (
           <View style={styles.imagePlaceholder}>
-            <Ionicons name={(categoryInfo?.icon as any) ?? 'calendar-outline'} size={40} color={COLORS.primary} />
+            <Ionicons name={categoryInfo?.icon ?? 'calendar-outline'} size={40} color={COLORS.primary} />
           </View>
         )}
         {event.is_premium_only && (
@@ -46,7 +46,7 @@ export function EventCard({ event, onPress }: EventCardProps) {
       <View style={styles.content}>
         <View style={styles.categoryRow}>
           <View style={styles.categoryChip}>
-            <Ionicons name={(categoryInfo?.icon as any) ?? 'calendar-outline'} size={12} color={COLORS.primary} />
+            <Ionicons name={categoryInfo?.icon ?? 'calendar-outline'} size={12} color={COLORS.primary} />
             <Text style={styles.categoryText}>{event.category}</Text>
           </View>
         </View>

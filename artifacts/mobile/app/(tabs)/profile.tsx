@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useProfile } from '@/context/ProfileContext';
 import { CATEGORIES, IoniconsName } from '@/lib/types';
+import { getZodiacColorBySign } from '@/lib/zodiac';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -70,6 +71,10 @@ export default function ProfileScreen() {
     { label: 'Streak', value: streak > 0 ? `${streak}W` : '—', icon: 'flame', color: COLORS.gold },
   ];
 
+  const zodiacColor = profile?.zodiac_sign
+    ? getZodiacColorBySign(profile.zodiac_sign)
+    : COLORS.primary;
+
   return (
     <ScrollView
       style={styles.container}
@@ -112,12 +117,32 @@ export default function ProfileScreen() {
           {profile?.display_name ?? 'Name'}{profile?.age ? `, ${profile.age}` : ''}
         </Text>
 
-        {profile?.city && (
-          <View style={styles.locationRow}>
-            <Ionicons name="location-outline" size={13} color={COLORS.textMuted} />
-            <Text style={styles.locationText}>{profile.city}</Text>
-          </View>
-        )}
+        <View style={styles.metaRow}>
+          {profile?.city && (
+            <View style={styles.metaChip}>
+              <Ionicons name="location-outline" size={12} color={COLORS.textMuted} />
+              <Text style={styles.metaChipText}>{profile.city}</Text>
+            </View>
+          )}
+          {profile?.zodiac_sign && (
+            <View style={[styles.metaChip, { borderColor: zodiacColor + '44', backgroundColor: zodiacColor + '18' }]}>
+              <Ionicons name="star" size={12} color={zodiacColor} />
+              <Text style={[styles.metaChipText, { color: zodiacColor }]}>{profile.zodiac_sign}</Text>
+            </View>
+          )}
+          {profile?.occupation && (
+            <View style={styles.metaChip}>
+              <Ionicons name="briefcase-outline" size={12} color={COLORS.textMuted} />
+              <Text style={styles.metaChipText}>{profile.occupation}</Text>
+            </View>
+          )}
+          {profile?.height_cm && (
+            <View style={styles.metaChip}>
+              <Ionicons name="resize-outline" size={12} color={COLORS.textMuted} />
+              <Text style={styles.metaChipText}>{profile.height_cm} cm</Text>
+            </View>
+          )}
+        </View>
 
         {profile?.bio && (
           <Text style={styles.bio} numberOfLines={3}>{profile.bio}</Text>
@@ -135,6 +160,21 @@ export default function ProfileScreen() {
           </View>
         ))}
       </View>
+
+      {profile?.personality_summary && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Persönlichkeit</Text>
+          <LinearGradient colors={['#7C6FFF18', '#7C6FFF28']} style={styles.personalityCard}>
+            <View style={styles.personalityHeader}>
+              <View style={styles.personalityIconWrap}>
+                <Ionicons name="sparkles" size={16} color={COLORS.primary} />
+              </View>
+              <Text style={styles.personalityLabel}>KI-Persönlichkeitsanalyse</Text>
+            </View>
+            <Text style={styles.personalityText}>"{profile.personality_summary}"</Text>
+          </LinearGradient>
+        </View>
+      )}
 
       {profile?.interests && profile.interests.length > 0 && (
         <View style={styles.section}>
@@ -241,9 +281,14 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: COLORS.background,
   },
   proBadgeText: { color: '#000', fontSize: 9, fontFamily: 'Inter_700Bold' },
-  name: { color: COLORS.text, fontSize: 22, fontFamily: 'Inter_700Bold', marginBottom: 6 },
-  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 10 },
-  locationText: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular' },
+  name: { color: COLORS.text, fontSize: 22, fontFamily: 'Inter_700Bold', marginBottom: 10 },
+  metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', marginBottom: 12 },
+  metaChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20,
+    backgroundColor: COLORS.surfaceAlt, borderWidth: 1, borderColor: COLORS.surfaceBorder,
+  },
+  metaChipText: { color: COLORS.textMuted, fontSize: 12, fontFamily: 'Inter_400Regular' },
   bio: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   statCard: {
@@ -258,6 +303,18 @@ const styles = StyleSheet.create({
   statLabel: { color: COLORS.textMuted, fontSize: 11, fontFamily: 'Inter_400Regular' },
   section: { marginBottom: 20 },
   sectionTitle: { color: COLORS.textMuted, fontSize: 12, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.8, marginBottom: 10, textTransform: 'uppercase' },
+  personalityCard: {
+    padding: 16, borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(124,111,255,0.25)',
+  },
+  personalityHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
+  personalityIconWrap: {
+    width: 28, height: 28, borderRadius: 8,
+    backgroundColor: 'rgba(124,111,255,0.2)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  personalityLabel: { color: COLORS.textMuted, fontSize: 12, fontFamily: 'Inter_500Medium' },
+  personalityText: { color: COLORS.text, fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 22, fontStyle: 'italic' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   interestChip: {
     flexDirection: 'row', alignItems: 'center', gap: 5,

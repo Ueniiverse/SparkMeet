@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity,
   Image, Alert, ActivityIndicator, Platform,
@@ -13,18 +13,22 @@ import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '@/context/ProfileContext';
 import { useAuth } from '@/context/AuthContext';
+import { getZodiacColorBySign } from '@/lib/zodiac';
 
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { profile, refreshProfile } = useProfile();
   const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
-  const [age, setAge] = useState(String(profile?.age ?? ''));
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [city, setCity] = useState(profile?.city ?? '');
+  const [occupation, setOccupation] = useState(profile?.occupation ?? '');
+  const [heightCm, setHeightCm] = useState(profile?.height_cm ? String(profile.height_cm) : '');
   const [interests, setInterests] = useState<string[]>(profile?.interests ?? []);
   const [photos, setPhotos] = useState<string[]>(profile?.profile_images ?? []);
   const [saving, setSaving] = useState(false);
+
+  const zodiacSign = profile?.zodiac_sign ?? null;
 
   const toggleInterest = (key: string) => {
     Haptics.selectionAsync();
@@ -51,8 +55,10 @@ export default function EditProfileScreen() {
   const handleSave = async () => {
     if (!user) return;
     if (!displayName.trim()) { Alert.alert('Fehler', 'Name darf nicht leer sein.'); return; }
-    const ageNum = parseInt(age);
-    if (isNaN(ageNum) || ageNum < 18 || ageNum > 99) { Alert.alert('Fehler', 'Ungültiges Alter.'); return; }
+    const heightNum = heightCm ? parseInt(heightCm) : null;
+    if (heightCm && (isNaN(heightNum!) || heightNum! < 100 || heightNum! > 250)) {
+      Alert.alert('Fehler', 'Ungültige Körpergröße (100-250 cm).'); return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSaving(true);
@@ -61,10 +67,7 @@ export default function EditProfileScreen() {
       const uploadedUrls: string[] = [];
       for (let i = 0; i < photos.length; i++) {
         const uri = photos[i];
-        if (uri.startsWith('http')) {
-          uploadedUrls.push(uri);
-          continue;
-        }
+        if (uri.startsWith('http')) { uploadedUrls.push(uri); continue; }
         const ext = uri.split('.').pop() ?? 'jpg';
         const fileName = `${user.id}/${Date.now()}_${i}.${ext}`;
         const response = await fetch(uri);
@@ -80,9 +83,10 @@ export default function EditProfileScreen() {
 
       const { error } = await supabase.from('profiles').update({
         display_name: displayName.trim(),
-        age: ageNum,
         bio: bio.trim(),
         city: city.trim(),
+        occupation: occupation.trim() || null,
+        height_cm: heightNum,
         interests,
         profile_images: uploadedUrls,
         last_active: new Date().toISOString(),
@@ -92,8 +96,9 @@ export default function EditProfileScreen() {
       await refreshProfile();
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
-    } catch (e: any) {
-      Alert.alert('Fehler', e?.message ?? 'Speichern fehlgeschlagen.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Speichern fehlgeschlagen.';
+      Alert.alert('Fehler', msg);
     } finally {
       setSaving(false);
     }
@@ -139,35 +144,61 @@ export default function EditProfileScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Infos</Text>
+        <Text style={styles.sectionTitle}>Persönliche Infos</Text>
         <View style={styles.inputGroup}>
-          {[
-            { label: 'Name', value: displayName, onChange: setDisplayName, icon: 'person-outline' as const },
-            { label: 'Stadt', value: city, onChange: setCity, icon: 'location-outline' as const },
-          ].map(field => (
-            <View key={field.label} style={styles.inputWrapper}>
-              <Ionicons name={field.icon} size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
-              <TextInput
-                style={styles.input}
-                placeholder={field.label}
-                placeholderTextColor={COLORS.textDim}
-                value={field.value}
-                onChangeText={field.onChange}
-              />
-            </View>
-          ))}
           <View style={styles.inputWrapper}>
-            <Ionicons name="calendar-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
+            <Ionicons name="person-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
             <TextInput
               style={styles.input}
-              placeholder="Alter"
+              placeholder="Name"
               placeholderTextColor={COLORS.textDim}
-              value={age}
-              onChangeText={setAge}
-              keyboardType="number-pad"
-              maxLength={2}
+              value={displayName}
+              onChangeText={setDisplayName}
+              selectionColor={COLORS.primary}
             />
           </View>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="location-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
+            <TextInput
+              style={styles.input}
+              placeholder="Stadt"
+              placeholderTextColor={COLORS.textDim}
+              value={city}
+              onChangeText={setCity}
+              selectionColor={COLORS.primary}
+            />
+          </View>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="briefcase-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
+            <TextInput
+              style={styles.input}
+              placeholder="Beruf (optional)"
+              placeholderTextColor={COLORS.textDim}
+              value={occupation}
+              onChangeText={setOccupation}
+              selectionColor={COLORS.primary}
+            />
+          </View>
+          <View style={styles.inputWrapper}>
+            <Ionicons name="resize-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
+            <TextInput
+              style={styles.input}
+              placeholder="Körpergröße in cm (optional)"
+              placeholderTextColor={COLORS.textDim}
+              value={heightCm}
+              onChangeText={v => setHeightCm(v.replace(/\D/g, '').slice(0, 3))}
+              keyboardType="number-pad"
+              maxLength={3}
+              selectionColor={COLORS.primary}
+            />
+          </View>
+          {zodiacSign && (
+            <View style={[styles.inputWrapper, styles.zodiacReadOnly]}>
+              <Ionicons name="star" size={18} color={getZodiacColorBySign(zodiacSign)} style={{ marginRight: 10 }} />
+              <Text style={styles.zodiacText}>{zodiacSign}</Text>
+              <Text style={styles.zodiacHint}>automatisch ermittelt</Text>
+            </View>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>Bio</Text>
@@ -180,6 +211,8 @@ export default function EditProfileScreen() {
             onChangeText={t => setBio(t.slice(0, 300))}
             multiline
             numberOfLines={4}
+            textAlignVertical="top"
+            selectionColor={COLORS.primary}
           />
           <Text style={styles.bioCounter}>{bio.length}/300</Text>
         </View>
@@ -238,6 +271,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.surfaceBorder,
     borderRadius: 14, height: 52, paddingHorizontal: 14,
   },
+  zodiacReadOnly: { opacity: 0.7 },
+  zodiacText: { flex: 1, color: COLORS.text, fontSize: 15, fontFamily: 'Inter_500Medium' },
+  zodiacHint: { color: COLORS.textDim, fontSize: 11, fontFamily: 'Inter_400Regular' },
   input: { flex: 1, color: COLORS.text, fontSize: 15, fontFamily: 'Inter_400Regular' },
   bioWrapper: {
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.surfaceBorder,

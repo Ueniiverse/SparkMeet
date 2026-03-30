@@ -13,6 +13,12 @@ CREATE TABLE IF NOT EXISTS profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   display_name TEXT,
   age INTEGER,
+  birthdate DATE,
+  zodiac_sign TEXT,
+  height_cm INTEGER,
+  occupation TEXT,
+  personality_summary TEXT,
+  ai_answers JSONB DEFAULT '[]',
   bio TEXT CHECK (char_length(bio) <= 300),
   profile_images TEXT[] DEFAULT '{}',
   interests TEXT[] DEFAULT '{}',
@@ -26,6 +32,14 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT NOW(),
   last_active TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: add new profile columns if upgrading from an older schema version
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS birthdate DATE;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS zodiac_sign TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS height_cm INTEGER;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS occupation TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS personality_summary TEXT;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS ai_answers JSONB DEFAULT '[]';
 
 -- Events
 CREATE TABLE IF NOT EXISTS events (

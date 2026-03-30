@@ -30,7 +30,7 @@ export default function GenderScreen() {
         <Ionicons name="chevron-back" size={24} color={COLORS.text} />
       </TouchableOpacity>
       <View style={styles.steps}>
-        {[0, 1, 2, 3, 4].map(i => (
+        {[0, 1, 2, 3, 4, 5].map(i => (
           <View key={i} style={[styles.step, i === 2 && styles.stepActive]} />
         ))}
       </View>

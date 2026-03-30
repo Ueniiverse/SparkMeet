@@ -7,6 +7,12 @@ export interface Profile {
   id: string;
   display_name: string | null;
   age: number | null;
+  birthdate: string | null;
+  zodiac_sign: string | null;
+  height_cm: number | null;
+  occupation: string | null;
+  personality_summary: string | null;
+  ai_answers: Array<{ question: string; answer: string }>;
   bio: string | null;
   profile_images: string[];
   interests: string[];

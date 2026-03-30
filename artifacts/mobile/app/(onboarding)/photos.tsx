@@ -49,9 +49,14 @@ export default function PhotosScreen() {
     try {
       const name = await AsyncStorage.getItem('onboarding_name') ?? '';
       const age = parseInt(await AsyncStorage.getItem('onboarding_age') ?? '0');
+      const birthdate = await AsyncStorage.getItem('onboarding_birthdate') ?? null;
+      const zodiac_sign = await AsyncStorage.getItem('onboarding_zodiac_sign') ?? null;
       const gender = await AsyncStorage.getItem('onboarding_gender') ?? '';
       const looking_for = await AsyncStorage.getItem('onboarding_looking_for') ?? '';
       const interests = JSON.parse(await AsyncStorage.getItem('onboarding_interests') ?? '[]');
+      const personality_summary = await AsyncStorage.getItem('onboarding_personality_summary') ?? null;
+      const ai_answers_raw = await AsyncStorage.getItem('onboarding_ai_answers') ?? '[]';
+      const ai_answers = JSON.parse(ai_answers_raw);
 
       let city = '';
       if (Platform.OS !== 'web') {
@@ -72,7 +77,7 @@ export default function PhotosScreen() {
         const fileName = `${user.id}/${Date.now()}_${i}.${ext}`;
         const response = await fetch(uri);
         const blob = await response.blob();
-        const { data, error } = await supabase.storage
+        const { data } = await supabase.storage
           .from('profile-images')
           .upload(fileName, blob, { contentType: `image/${ext}`, upsert: true });
         if (data) {
@@ -87,11 +92,15 @@ export default function PhotosScreen() {
         id: user.id,
         display_name: name,
         age,
+        birthdate,
+        zodiac_sign,
         gender,
         looking_for,
         interests,
         city,
         profile_images: uploadedUrls,
+        personality_summary,
+        ai_answers,
         events_joined: [],
         is_pro: false,
         created_at: new Date().toISOString(),
@@ -101,15 +110,16 @@ export default function PhotosScreen() {
       if (error) throw error;
 
       await AsyncStorage.multiRemove([
-        'onboarding_name', 'onboarding_age', 'onboarding_gender',
-        'onboarding_looking_for', 'onboarding_interests',
+        'onboarding_name', 'onboarding_age', 'onboarding_birthdate',
+        'onboarding_zodiac_sign', 'onboarding_gender', 'onboarding_looking_for',
+        'onboarding_interests', 'onboarding_personality_summary', 'onboarding_ai_answers',
       ]);
 
-      // Refresh profile in memory so AuthGuard sees the completed profile
       await refreshProfile();
       router.replace('/(tabs)');
-    } catch (e: any) {
-      Alert.alert('Fehler', e?.message ?? 'Profil konnte nicht gespeichert werden.');
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Profil konnte nicht gespeichert werden.';
+      Alert.alert('Fehler', msg);
     } finally {
       setUploading(false);
     }
@@ -121,8 +131,8 @@ export default function PhotosScreen() {
         <Ionicons name="chevron-back" size={24} color={COLORS.text} />
       </TouchableOpacity>
       <View style={styles.steps}>
-        {[0, 1, 2, 3, 4].map(i => (
-          <View key={i} style={[styles.step, i === 4 && styles.stepActive]} />
+        {[0, 1, 2, 3, 4, 5].map(i => (
+          <View key={i} style={[styles.step, i === 5 && styles.stepActive]} />
         ))}
       </View>
 

@@ -10,16 +10,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function NameAgeScreen() {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
-  const [age, setAge] = useState('');
 
   const handleNext = async () => {
     if (!name.trim()) { Alert.alert('Fehler', 'Bitte deinen Namen eingeben.'); return; }
-    const ageNum = parseInt(age);
-    if (!ageNum || ageNum < 18 || ageNum > 99) { Alert.alert('Fehler', 'Bitte ein gültiges Alter (18-99) eingeben.'); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await AsyncStorage.setItem('onboarding_name', name.trim());
-    await AsyncStorage.setItem('onboarding_age', age);
-    router.push('/(onboarding)/gender');
+    router.push('/(onboarding)/birthdate');
   };
 
   return (
@@ -29,14 +25,14 @@ export default function NameAgeScreen() {
       </TouchableOpacity>
 
       <View style={styles.steps}>
-        {[0, 1, 2, 3, 4].map(i => (
-          <View key={i} style={[styles.step, i === 1 && styles.stepActive]} />
+        {[0, 1, 2, 3, 4, 5].map(i => (
+          <View key={i} style={[styles.step, i === 0 && styles.stepActive]} />
         ))}
       </View>
 
       <View style={styles.content}>
         <Text style={styles.heading}>Wie heißt du?</Text>
-        <Text style={styles.subheading}>Dein Vorname und Alter werden anderen angezeigt.</Text>
+        <Text style={styles.subheading}>Dein Vorname wird anderen angezeigt.</Text>
 
         <View style={styles.inputGroup}>
           <View style={styles.inputWrapper}>
@@ -49,24 +45,15 @@ export default function NameAgeScreen() {
               onChangeText={setName}
               autoCapitalize="words"
               autoFocus
-            />
-          </View>
-          <View style={styles.inputWrapper}>
-            <Ionicons name="calendar-outline" size={18} color={COLORS.textMuted} style={{ marginRight: 10 }} />
-            <TextInput
-              style={styles.input}
-              placeholder="Alter"
-              placeholderTextColor={COLORS.textDim}
-              value={age}
-              onChangeText={setAge}
-              keyboardType="number-pad"
-              maxLength={2}
+              returnKeyType="done"
+              onSubmitEditing={handleNext}
+              selectionColor={COLORS.primary}
             />
           </View>
         </View>
       </View>
 
-      <TouchableOpacity style={styles.nextBtn} onPress={handleNext} activeOpacity={0.85}>
+      <TouchableOpacity style={[styles.nextBtn, !name.trim() && styles.nextBtnDisabled]} onPress={handleNext} activeOpacity={0.85} disabled={!name.trim()}>
         <Text style={styles.nextBtnText}>Weiter</Text>
         <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
       </TouchableOpacity>
@@ -94,5 +81,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary, borderRadius: 18, height: 58,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
   },
+  nextBtnDisabled: { opacity: 0.4 },
   nextBtnText: { color: COLORS.white, fontSize: 17, fontFamily: 'Inter_600SemiBold' },
 });

@@ -23,7 +23,7 @@ export default function InterestsScreen() {
     if (selected.length === 0) { Alert.alert('Fehler', 'Wähle mindestens ein Interesse aus.'); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await AsyncStorage.setItem('onboarding_interests', JSON.stringify(selected));
-    router.push('/(onboarding)/photos');
+    router.push('/(onboarding)/ai-interview');
   };
 
   return (
@@ -32,7 +32,7 @@ export default function InterestsScreen() {
         <Ionicons name="chevron-back" size={24} color={COLORS.text} />
       </TouchableOpacity>
       <View style={styles.steps}>
-        {[0, 1, 2, 3, 4].map(i => (
+        {[0, 1, 2, 3, 4, 5].map(i => (
           <View key={i} style={[styles.step, i === 3 && styles.stepActive]} />
         ))}
       </View>

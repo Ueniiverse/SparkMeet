@@ -17,7 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 export default function CreateEventScreen() {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { profile, canCreateEvent } = useProfile();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -29,6 +29,30 @@ export default function CreateEventScreen() {
   const [maxParticipants, setMaxParticipants] = useState('8');
   const [price, setPrice] = useState('0');
   const [saving, setSaving] = useState(false);
+
+  if (!canCreateEvent) {
+    return (
+      <View style={[styles.container, { alignItems: 'center', justifyContent: 'center', padding: 32 }]}>
+        <Ionicons name="lock-closed" size={48} color={COLORS.primary} style={{ marginBottom: 20 }} />
+        <Text style={{ color: COLORS.text, fontSize: 22, fontFamily: 'Inter_700Bold', textAlign: 'center', marginBottom: 12 }}>
+          Pro-Funktion
+        </Text>
+        <Text style={{ color: COLORS.textMuted, fontSize: 15, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 24, marginBottom: 32 }}>
+          Das Erstellen von Events ist nur für Pro-Mitglieder verfügbar.
+        </Text>
+        <TouchableOpacity
+          style={{ backgroundColor: COLORS.primary, borderRadius: 16, height: 54, alignItems: 'center', justifyContent: 'center', width: '100%' }}
+          onPress={() => router.replace('/paywall')}
+          activeOpacity={0.85}
+        >
+          <Text style={{ color: COLORS.white, fontSize: 16, fontFamily: 'Inter_600SemiBold' }}>Jetzt upgraden</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 16 }}>
+          <Text style={{ color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular' }}>Zurück</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const handleCreate = async () => {
     if (!title.trim()) { Alert.alert('Fehler', 'Bitte einen Titel eingeben.'); return; }

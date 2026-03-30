@@ -72,11 +72,15 @@ export default function PostLikeScreen() {
           .single();
 
         if (mutualLike) {
-          const existingMatch = await supabase.from('matches').select('*')
+          const existingMatch = await supabase.from('matches').select('id')
             .or(`and(user_id_1.eq.${user.id},user_id_2.eq.${toId}),and(user_id_1.eq.${toId},user_id_2.eq.${user.id})`)
-            .single();
+            .maybeSingle();
 
-          if (!existingMatch.data && canCreateMatch) {
+          if (!existingMatch.data) {
+            if (!canCreateMatch) {
+              router.push('/paywall');
+              return;
+            }
             await supabase.from('matches').insert({
               user_id_1: user.id,
               user_id_2: toId,

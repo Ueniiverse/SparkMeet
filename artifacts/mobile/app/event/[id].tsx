@@ -43,20 +43,16 @@ export default function EventDetailScreen() {
         router.push('/paywall');
         throw new Error('Limit reached');
       }
+      if (event.is_premium_only && !profile?.is_pro && !isJoined) {
+        router.push('/paywall');
+        throw new Error('Premium Only');
+      }
       if (isJoined) {
-        const updated = event.current_participants.filter(id => id !== user.id);
-        const { error } = await supabase.from('events').update({ current_participants: updated }).eq('id', event.id);
+        const { error } = await supabase.rpc('leave_event', { p_event_id: event.id });
         if (error) throw error;
-        await supabase.from('profiles').update({
-          events_joined: (profile?.events_joined ?? []).filter(eid => eid !== event.id),
-        }).eq('id', user.id);
       } else {
-        const updated = [...(event.current_participants ?? []), user.id];
-        const { error } = await supabase.from('events').update({ current_participants: updated }).eq('id', event.id);
+        const { error } = await supabase.rpc('join_event', { p_event_id: event.id });
         if (error) throw error;
-        await supabase.from('profiles').update({
-          events_joined: [...(profile?.events_joined ?? []), event.id],
-        }).eq('id', user.id);
       }
     },
     onSuccess: () => {
@@ -66,7 +62,7 @@ export default function EventDetailScreen() {
       refreshProfile();
     },
     onError: (err: Error) => {
-      if (err.message !== 'Limit reached') Alert.alert('Fehler', err.message);
+      if (err.message !== 'Limit reached' && err.message !== 'Premium Only') Alert.alert('Fehler', err.message);
     },
   });
 

@@ -35,10 +35,24 @@ export default function RegisterScreen() {
     setLoading(true);
     const { data, error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
+
     if (error) {
       Alert.alert('Registrierung fehlgeschlagen', error.message);
-    } else if (data.user) {
-      // Create minimal profile so ProfileContext can find it immediately
+      return;
+    }
+
+    // Email confirmation required (Supabase setting)
+    if (data.user && !data.session) {
+      Alert.alert(
+        'E-Mail bestätigen',
+        'Bitte bestätige deine E-Mail-Adresse. Dann kannst du dich anmelden.',
+        [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
+      );
+      return;
+    }
+
+    if (data.user) {
+      // Create profile in app code as fallback (trigger may also do this)
       await supabase.from('profiles').upsert({ id: data.user.id }, { onConflict: 'id' });
       router.replace('/');
     }

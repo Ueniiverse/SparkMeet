@@ -6,7 +6,6 @@ import {
 import Animated, {
   useSharedValue, useAnimatedStyle, withSequence,
   withTiming, withRepeat, Easing, interpolateColor,
-  FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,7 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// ─── Logo animation ──────────────────────────────────────────────────────────
+// ─── Logo animation ───────────────────────────────────────────────────────────
 const S = 60;
 const CROSS = 300;
 const HEART = 1500;
@@ -31,7 +30,7 @@ function useLogoAnimation() {
   const phase = useSharedValue(0);
 
   useEffect(() => {
-    const shakeLoop = withSequence(
+    shake.value = withRepeat(withSequence(
       withTiming(-7, { duration: S, easing: Easing.linear }),
       withTiming(7, { duration: S, easing: Easing.linear }),
       withTiming(-6, { duration: S, easing: Easing.linear }),
@@ -41,8 +40,7 @@ function useLogoAnimation() {
       withTiming(-2, { duration: S, easing: Easing.linear }),
       withTiming(0, { duration: S, easing: Easing.linear }),
       withTiming(0, { duration: CROSS + HEART + CROSS + PAUSE }),
-    );
-    shake.value = withRepeat(shakeLoop, -1, false);
+    ), -1, false);
 
     flashOpacity.value = withRepeat(withSequence(
       withTiming(1, { duration: 8 * S }),
@@ -108,98 +106,31 @@ function useLogoAnimation() {
   return { containerStyle, ringStyle, glowStyle, flashIconStyle, heartIconStyle };
 }
 
-// ─── Auth logic ───────────────────────────────────────────────────────────────
-type AuthStatus = 'idle' | 'loading' | 'registering';
-
-const STATUS_LABELS: Record<AuthStatus, string> = {
-  idle: '',
-  loading: 'Wird geprüft...',
-  registering: 'Konto wird erstellt...',
-};
-
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [authStatus, setAuthStatus] = useState<AuthStatus>('idle');
   const logo = useLogoAnimation();
 
-  const isLoading = authStatus !== 'idle';
-
-  const handleContinue = async () => {
+  const handleLogin = async () => {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail || !password) {
       Alert.alert('Fehlende Felder', 'Bitte E-Mail und Passwort eingeben.');
       return;
     }
-    if (password.length < 6) {
-      Alert.alert('Passwort zu kurz', 'Das Passwort muss mindestens 6 Zeichen haben.');
-      return;
-    }
-
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setAuthStatus('loading');
-
-    // 1. Try sign in first
-    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
-      email: trimmedEmail,
-      password,
-    });
-
-    if (!loginError && loginData.session) {
-      // Existing user logged in
-      setAuthStatus('idle');
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: trimmedEmail, password });
+    setLoading(false);
+    if (error) {
+      Alert.alert('Anmeldung fehlgeschlagen', error.message);
+    } else {
       router.replace('/');
-      return;
     }
-
-    // 2. If "Invalid login credentials" → could be unknown email OR wrong password
-    if (loginError?.message === 'Invalid login credentials') {
-      setAuthStatus('registering');
-
-      const { data: signupData, error: signupError } = await supabase.auth.signUp({
-        email: trimmedEmail,
-        password,
-      });
-
-      // Email already exists → wrong password
-      if (signupError?.message?.toLowerCase().includes('already registered') ||
-          signupError?.message?.toLowerCase().includes('already been registered')) {
-        setAuthStatus('idle');
-        Alert.alert('Falsches Passwort', 'Diese E-Mail ist bereits registriert. Bitte überprüfe dein Passwort.');
-        return;
-      }
-
-      if (signupError) {
-        setAuthStatus('idle');
-        Alert.alert('Registrierung fehlgeschlagen', signupError.message);
-        return;
-      }
-
-      if (signupData.user) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setAuthStatus('idle');
-
-        if (signupData.session) {
-          // Email confirmation disabled in Supabase → directly logged in → onboarding
-          router.replace('/');
-        } else {
-          // Email confirmation still enabled in Supabase
-          Alert.alert(
-            'Konto erstellt',
-            'Bitte bestätige deine E-Mail-Adresse und melde dich dann an.',
-            [{ text: 'OK' }]
-          );
-        }
-        return;
-      }
-    }
-
-    // 3. Any other error (network, etc.)
-    setAuthStatus('idle');
-    Alert.alert('Fehler', loginError?.message ?? 'Unbekannter Fehler. Bitte erneut versuchen.');
   };
 
   const handleAppleSignIn = () => {
@@ -238,7 +169,7 @@ export default function LoginScreen() {
               </Animated.View>
             </Animated.View>
             <Text style={styles.appName}>SparkMeet</Text>
-            <Text style={styles.tagline}>Einfach E-Mail eingeben — wir erkennen ob du neu bist</Text>
+            <Text style={styles.slogan}>Triff Menschen, nicht Profile.</Text>
           </View>
 
           {/* Apple */}
@@ -266,7 +197,7 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
-                editable={!isLoading}
+                editable={!loading}
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
               />
@@ -281,12 +212,12 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPw}
-                autoComplete="password"
-                editable={!isLoading}
+                autoComplete="current-password"
+                editable={!loading}
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
               />
-              <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn} disabled={isLoading}>
+              <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn} disabled={loading}>
                 <Ionicons
                   name={showPw ? 'eye-off-outline' : 'eye-outline'}
                   size={18}
@@ -296,28 +227,18 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          {/* Forgot password */}
           <TouchableOpacity
             style={styles.forgotBtn}
             onPress={() => router.push('/(auth)/forgot-password')}
-            disabled={isLoading}
+            disabled={loading}
           >
             <Text style={styles.forgotText}>Passwort vergessen?</Text>
           </TouchableOpacity>
 
-          {/* Status hint */}
-          {isLoading && (
-            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.statusRow}>
-              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 8 }} />
-              <Text style={styles.statusText}>{STATUS_LABELS[authStatus]}</Text>
-            </Animated.View>
-          )}
-
-          {/* CTA */}
           <TouchableOpacity
-            style={[styles.loginBtn, isLoading && { opacity: 0.65 }]}
-            onPress={handleContinue}
-            disabled={isLoading}
+            style={[styles.loginBtn, loading && { opacity: 0.65 }]}
+            onPress={handleLogin}
+            disabled={loading}
             activeOpacity={0.88}
           >
             <LinearGradient
@@ -325,18 +246,20 @@ export default function LoginScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.loginBtnGradient}
             >
-              {isLoading ? (
+              {loading ? (
                 <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.loginBtnText}>Weiter</Text>
+                <Text style={styles.loginBtnText}>Anmelden</Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
 
-          {/* Hint */}
-          <Text style={styles.hint}>
-            Noch kein Konto? Einfach loslegen — wir erstellen es automatisch.
-          </Text>
+          <View style={styles.registerRow}>
+            <Text style={styles.registerText}>Noch kein Konto? </Text>
+            <TouchableOpacity onPress={() => router.push('/(auth)/register')} disabled={loading}>
+              <Text style={styles.registerLink}>Registrieren</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -363,8 +286,14 @@ const styles = StyleSheet.create({
     borderWidth: 1.5, borderColor: 'transparent',
     alignItems: 'center', justifyContent: 'center',
   },
-  appName: { color: COLORS.text, fontSize: 34, fontFamily: 'Inter_700Bold', letterSpacing: -0.5, marginBottom: 8 },
-  tagline: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
+  appName: {
+    color: COLORS.text, fontSize: 34, fontFamily: 'Inter_700Bold',
+    letterSpacing: -0.5, marginBottom: 6,
+  },
+  slogan: {
+    color: COLORS.textMuted, fontSize: 15, fontFamily: 'Inter_400Regular',
+    textAlign: 'center', letterSpacing: 0.1,
+  },
   appleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.surfaceBorder,
@@ -383,15 +312,12 @@ const styles = StyleSheet.create({
   fieldFocused: { borderColor: COLORS.primary },
   input: { flex: 1, color: COLORS.text, fontSize: 15, fontFamily: 'Inter_400Regular' },
   eyeBtn: { padding: 4 },
-  forgotBtn: { alignSelf: 'flex-end', marginBottom: 18 },
+  forgotBtn: { alignSelf: 'flex-end', marginBottom: 22 },
   forgotText: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular' },
-  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  statusText: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular' },
-  loginBtn: { borderRadius: 18, overflow: 'hidden', marginBottom: 20 },
+  loginBtn: { borderRadius: 18, overflow: 'hidden', marginBottom: 28 },
   loginBtnGradient: { height: 58, alignItems: 'center', justifyContent: 'center' },
   loginBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
-  hint: {
-    color: COLORS.textDim, fontSize: 12, fontFamily: 'Inter_400Regular',
-    textAlign: 'center', lineHeight: 17, paddingHorizontal: 12,
-  },
+  registerRow: { flexDirection: 'row', justifyContent: 'center' },
+  registerText: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  registerLink: { color: COLORS.primary, fontSize: 14, fontFamily: 'Inter_700Bold' },
 });

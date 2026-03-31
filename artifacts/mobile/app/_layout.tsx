@@ -60,7 +60,10 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }, [session, authLoading, profile, profileLoading, segments]);
 
-  if (authLoading || (session && profileLoading)) {
+  // Only block rendering when a session exists and profile is still fetching.
+  // During the initial auth check (authLoading) we render children right away so
+  // the login screen is visible immediately — no double-spinner on app start.
+  if (session && profileLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: COLORS.background, alignItems: "center", justifyContent: "center" }}>
         <ActivityIndicator color={COLORS.primary} size="large" />

@@ -6,6 +6,7 @@ import {
 import Animated, {
   useSharedValue, useAnimatedStyle, withSequence,
   withTiming, withRepeat, Easing, interpolateColor,
+  FadeIn, FadeOut,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,11 +16,11 @@ import { supabase } from '@/lib/supabase';
 import { COLORS } from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const S = 60;      // ms per shake step (8 steps = 480ms total)
-const CROSS = 300; // fade crossfade duration
-const HEART = 1500; // heart visible pause
-const PAUSE = 500;  // flash visible pause before shake repeats
-const TOTAL = 8 * S + CROSS + HEART + CROSS + PAUSE; // 3080ms
+// ─── Logo animation ──────────────────────────────────────────────────────────
+const S = 60;
+const CROSS = 300;
+const HEART = 1500;
+const PAUSE = 500;
 
 function useLogoAnimation() {
   const shake = useSharedValue(0);
@@ -27,10 +28,10 @@ function useLogoAnimation() {
   const flashScale = useSharedValue(1);
   const heartOpacity = useSharedValue(0);
   const heartScale = useSharedValue(0.4);
-  const phase = useSharedValue(0); // 0=flash, 1=heart
+  const phase = useSharedValue(0);
 
   useEffect(() => {
-    const shakeSeq = withSequence(
+    const shakeLoop = withSequence(
       withTiming(-7, { duration: S, easing: Easing.linear }),
       withTiming(7, { duration: S, easing: Easing.linear }),
       withTiming(-6, { duration: S, easing: Easing.linear }),
@@ -39,77 +40,65 @@ function useLogoAnimation() {
       withTiming(4, { duration: S, easing: Easing.linear }),
       withTiming(-2, { duration: S, easing: Easing.linear }),
       withTiming(0, { duration: S, easing: Easing.linear }),
-    );
-    const shakeLoop = withSequence(
-      shakeSeq,
       withTiming(0, { duration: CROSS + HEART + CROSS + PAUSE }),
     );
     shake.value = withRepeat(shakeLoop, -1, false);
 
-    const flashOpacityLoop = withSequence(
+    flashOpacity.value = withRepeat(withSequence(
       withTiming(1, { duration: 8 * S }),
       withTiming(0, { duration: CROSS, easing: Easing.out(Easing.quad) }),
       withTiming(0, { duration: HEART }),
       withTiming(1, { duration: CROSS, easing: Easing.in(Easing.quad) }),
       withTiming(1, { duration: PAUSE }),
-    );
-    flashOpacity.value = withRepeat(flashOpacityLoop, -1, false);
+    ), -1, false);
 
-    const flashScaleLoop = withSequence(
+    flashScale.value = withRepeat(withSequence(
       withTiming(1, { duration: 8 * S }),
       withTiming(0.5, { duration: CROSS, easing: Easing.out(Easing.back(2)) }),
       withTiming(0.5, { duration: HEART }),
       withTiming(1, { duration: CROSS, easing: Easing.out(Easing.back(1.5)) }),
       withTiming(1, { duration: PAUSE }),
-    );
-    flashScale.value = withRepeat(flashScaleLoop, -1, false);
+    ), -1, false);
 
-    const heartOpacityLoop = withSequence(
+    heartOpacity.value = withRepeat(withSequence(
       withTiming(0, { duration: 8 * S }),
       withTiming(1, { duration: CROSS, easing: Easing.out(Easing.quad) }),
       withTiming(1, { duration: HEART }),
       withTiming(0, { duration: CROSS, easing: Easing.in(Easing.quad) }),
       withTiming(0, { duration: PAUSE }),
-    );
-    heartOpacity.value = withRepeat(heartOpacityLoop, -1, false);
+    ), -1, false);
 
-    const heartScaleLoop = withSequence(
+    heartScale.value = withRepeat(withSequence(
       withTiming(0.4, { duration: 8 * S }),
       withTiming(1, { duration: CROSS, easing: Easing.out(Easing.back(2)) }),
       withTiming(1, { duration: HEART }),
       withTiming(0.4, { duration: CROSS, easing: Easing.in(Easing.back(1)) }),
       withTiming(0.4, { duration: PAUSE }),
-    );
-    heartScale.value = withRepeat(heartScaleLoop, -1, false);
+    ), -1, false);
 
-    const phaseLoop = withSequence(
+    phase.value = withRepeat(withSequence(
       withTiming(0, { duration: 8 * S + CROSS / 2 }),
       withTiming(1, { duration: 1 }),
       withTiming(1, { duration: HEART + CROSS / 2 - 1 }),
       withTiming(0, { duration: 1 }),
       withTiming(0, { duration: CROSS / 2 + PAUSE }),
-    );
-    phase.value = withRepeat(phaseLoop, -1, false);
+    ), -1, false);
   }, []);
 
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shake.value }],
   }));
-
   const ringStyle = useAnimatedStyle(() => ({
     borderColor: interpolateColor(phase.value, [0, 1], [COLORS.primary + '60', '#FF3B5560']),
   }));
-
   const glowStyle = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(phase.value, [0, 1], [COLORS.primary + '18', '#FF3B5518']),
   }));
-
   const flashIconStyle = useAnimatedStyle(() => ({
     opacity: flashOpacity.value,
     transform: [{ scale: flashScale.value }],
     position: 'absolute',
   }));
-
   const heartIconStyle = useAnimatedStyle(() => ({
     opacity: heartOpacity.value,
     transform: [{ scale: heartScale.value }],
@@ -119,29 +108,98 @@ function useLogoAnimation() {
   return { containerStyle, ringStyle, glowStyle, flashIconStyle, heartIconStyle };
 }
 
+// ─── Auth logic ───────────────────────────────────────────────────────────────
+type AuthStatus = 'idle' | 'loading' | 'registering';
+
+const STATUS_LABELS: Record<AuthStatus, string> = {
+  idle: '',
+  loading: 'Wird geprüft...',
+  registering: 'Konto wird erstellt...',
+};
+
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const { containerStyle, ringStyle, glowStyle, flashIconStyle, heartIconStyle } = useLogoAnimation();
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('idle');
+  const logo = useLogoAnimation();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
+  const isLoading = authStatus !== 'idle';
+
+  const handleContinue = async () => {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !password) {
       Alert.alert('Fehlende Felder', 'Bitte E-Mail und Passwort eingeben.');
       return;
     }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) {
-      Alert.alert('Anmeldung fehlgeschlagen', error.message);
-    } else {
-      router.replace('/');
+    if (password.length < 6) {
+      Alert.alert('Passwort zu kurz', 'Das Passwort muss mindestens 6 Zeichen haben.');
+      return;
     }
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setAuthStatus('loading');
+
+    // 1. Try sign in first
+    const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+      email: trimmedEmail,
+      password,
+    });
+
+    if (!loginError && loginData.session) {
+      // Existing user logged in
+      setAuthStatus('idle');
+      router.replace('/');
+      return;
+    }
+
+    // 2. If "Invalid login credentials" → could be unknown email OR wrong password
+    if (loginError?.message === 'Invalid login credentials') {
+      setAuthStatus('registering');
+
+      const { data: signupData, error: signupError } = await supabase.auth.signUp({
+        email: trimmedEmail,
+        password,
+      });
+
+      // Email already exists → wrong password
+      if (signupError?.message?.toLowerCase().includes('already registered') ||
+          signupError?.message?.toLowerCase().includes('already been registered')) {
+        setAuthStatus('idle');
+        Alert.alert('Falsches Passwort', 'Diese E-Mail ist bereits registriert. Bitte überprüfe dein Passwort.');
+        return;
+      }
+
+      if (signupError) {
+        setAuthStatus('idle');
+        Alert.alert('Registrierung fehlgeschlagen', signupError.message);
+        return;
+      }
+
+      if (signupData.user) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setAuthStatus('idle');
+
+        if (signupData.session) {
+          // Email confirmation disabled in Supabase → directly logged in → onboarding
+          router.replace('/');
+        } else {
+          // Email confirmation still enabled in Supabase
+          Alert.alert(
+            'Konto erstellt',
+            'Bitte bestätige deine E-Mail-Adresse und melde dich dann an.',
+            [{ text: 'OK' }]
+          );
+        }
+        return;
+      }
+    }
+
+    // 3. Any other error (network, etc.)
+    setAuthStatus('idle');
+    Alert.alert('Fehler', loginError?.message ?? 'Unbekannter Fehler. Bitte erneut versuchen.');
   };
 
   const handleAppleSignIn = () => {
@@ -165,23 +223,25 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* Logo */}
           <View style={styles.logoSection}>
-            <Animated.View style={[styles.logoRingWrapper, containerStyle]}>
-              <Animated.View style={[styles.logoRing, ringStyle]}>
-                <Animated.View style={[styles.logoInner, glowStyle]}>
-                  <Animated.View style={flashIconStyle}>
+            <Animated.View style={[styles.logoRingWrapper, logo.containerStyle]}>
+              <Animated.View style={[styles.logoRing, logo.ringStyle]}>
+                <Animated.View style={[styles.logoInner, logo.glowStyle]}>
+                  <Animated.View style={logo.flashIconStyle}>
                     <Ionicons name="flash" size={34} color={COLORS.primary} />
                   </Animated.View>
-                  <Animated.View style={heartIconStyle}>
+                  <Animated.View style={logo.heartIconStyle}>
                     <Ionicons name="heart" size={34} color="#FF3B55" />
                   </Animated.View>
                 </Animated.View>
               </Animated.View>
             </Animated.View>
             <Text style={styles.appName}>SparkMeet</Text>
-            <Text style={styles.tagline}>Verbinde dich über gemeinsame Erlebnisse</Text>
+            <Text style={styles.tagline}>Einfach E-Mail eingeben — wir erkennen ob du neu bist</Text>
           </View>
 
+          {/* Apple */}
           <TouchableOpacity style={styles.appleBtn} onPress={handleAppleSignIn} activeOpacity={0.85}>
             <Ionicons name="logo-apple" size={20} color={COLORS.text} />
             <Text style={styles.appleBtnText}>Mit Apple anmelden</Text>
@@ -193,6 +253,7 @@ export default function LoginScreen() {
             <View style={styles.dividerLine} />
           </View>
 
+          {/* Fields */}
           <View style={styles.fields}>
             <View style={[styles.field, focusedField === 'email' && styles.fieldFocused]}>
               <Ionicons name="mail-outline" size={18} color={focusedField === 'email' ? COLORS.primary : COLORS.textMuted} />
@@ -205,6 +266,7 @@ export default function LoginScreen() {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
+                editable={!isLoading}
                 onFocus={() => setFocusedField('email')}
                 onBlur={() => setFocusedField(null)}
               />
@@ -219,11 +281,12 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPw}
-                autoComplete="current-password"
+                autoComplete="password"
+                editable={!isLoading}
                 onFocus={() => setFocusedField('password')}
                 onBlur={() => setFocusedField(null)}
               />
-              <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn}>
+              <TouchableOpacity onPress={() => setShowPw(!showPw)} style={styles.eyeBtn} disabled={isLoading}>
                 <Ionicons
                   name={showPw ? 'eye-off-outline' : 'eye-outline'}
                   size={18}
@@ -233,17 +296,28 @@ export default function LoginScreen() {
             </View>
           </View>
 
+          {/* Forgot password */}
           <TouchableOpacity
             style={styles.forgotBtn}
             onPress={() => router.push('/(auth)/forgot-password')}
+            disabled={isLoading}
           >
             <Text style={styles.forgotText}>Passwort vergessen?</Text>
           </TouchableOpacity>
 
+          {/* Status hint */}
+          {isLoading && (
+            <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={styles.statusRow}>
+              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginRight: 8 }} />
+              <Text style={styles.statusText}>{STATUS_LABELS[authStatus]}</Text>
+            </Animated.View>
+          )}
+
+          {/* CTA */}
           <TouchableOpacity
-            style={[styles.loginBtn, loading && { opacity: 0.7 }]}
-            onPress={handleLogin}
-            disabled={loading}
+            style={[styles.loginBtn, isLoading && { opacity: 0.65 }]}
+            onPress={handleContinue}
+            disabled={isLoading}
             activeOpacity={0.88}
           >
             <LinearGradient
@@ -251,20 +325,18 @@ export default function LoginScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.loginBtnGradient}
             >
-              {loading ? (
-                <ActivityIndicator color={COLORS.white} size="small" />
+              {isLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
               ) : (
-                <Text style={styles.loginBtnText}>Anmelden</Text>
+                <Text style={styles.loginBtnText}>Weiter</Text>
               )}
             </LinearGradient>
           </TouchableOpacity>
 
-          <View style={styles.registerRow}>
-            <Text style={styles.registerText}>Noch kein Konto? </Text>
-            <TouchableOpacity onPress={() => router.push('/(auth)/register')}>
-              <Text style={styles.registerLink}>Registrieren</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Hint */}
+          <Text style={styles.hint}>
+            Noch kein Konto? Einfach loslegen — wir erstellen es automatisch.
+          </Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -292,7 +364,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   appName: { color: COLORS.text, fontSize: 34, fontFamily: 'Inter_700Bold', letterSpacing: -0.5, marginBottom: 8 },
-  tagline: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 },
+  tagline: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
   appleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     backgroundColor: COLORS.surface, borderWidth: 1, borderColor: COLORS.surfaceBorder,
@@ -311,12 +383,15 @@ const styles = StyleSheet.create({
   fieldFocused: { borderColor: COLORS.primary },
   input: { flex: 1, color: COLORS.text, fontSize: 15, fontFamily: 'Inter_400Regular' },
   eyeBtn: { padding: 4 },
-  forgotBtn: { alignSelf: 'flex-end', marginBottom: 22 },
+  forgotBtn: { alignSelf: 'flex-end', marginBottom: 18 },
   forgotText: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular' },
-  loginBtn: { borderRadius: 18, overflow: 'hidden', marginBottom: 28 },
+  statusRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  statusText: { color: COLORS.textMuted, fontSize: 13, fontFamily: 'Inter_400Regular' },
+  loginBtn: { borderRadius: 18, overflow: 'hidden', marginBottom: 20 },
   loginBtnGradient: { height: 58, alignItems: 'center', justifyContent: 'center' },
-  loginBtnText: { color: COLORS.white, fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
-  registerRow: { flexDirection: 'row', justifyContent: 'center' },
-  registerText: { color: COLORS.textMuted, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  registerLink: { color: COLORS.primary, fontSize: 14, fontFamily: 'Inter_700Bold' },
+  loginBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+  hint: {
+    color: COLORS.textDim, fontSize: 12, fontFamily: 'Inter_400Regular',
+    textAlign: 'center', lineHeight: 17, paddingHorizontal: 12,
+  },
 });

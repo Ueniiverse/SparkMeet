@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Image,
-  ScrollView, Platform, Alert,
+  ScrollView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -20,6 +20,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { signOut, user } = useAuth();
   const { profile, isPro } = useProfile();
+  const [deleting, setDeleting] = useState(false);
 
   const { data: matchCount = 0 } = useQuery<number>({
     queryKey: ['match-count', user?.id],
@@ -59,6 +60,69 @@ export default function ProfileScreen() {
       { text: 'Abbrechen', style: 'cancel' },
       { text: 'Abmelden', style: 'destructive', onPress: () => signOut() },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    Alert.alert(
+      'Konto löschen',
+      'Dein Profil, alle Matches und Nachrichten werden unwiderruflich gelöscht.',
+      [
+        { text: 'Abbrechen', style: 'cancel' },
+        {
+          text: 'Weiter',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Wirklich löschen?',
+              'Diese Aktion kann nicht rückgängig gemacht werden.',
+              [
+                { text: 'Abbrechen', style: 'cancel' },
+                {
+                  text: 'Konto löschen',
+                  style: 'destructive',
+                  onPress: confirmDeleteAccount,
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Keine Sitzung');
+
+      const domain = process.env.EXPO_PUBLIC_DOMAIN;
+      const url = domain ? `https://${domain}/api/account` : '/api/account';
+
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      const json = await res.json() as { success?: boolean; error?: string };
+
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? 'Unbekannter Fehler');
+      }
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await signOut();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unbekannter Fehler';
+      Alert.alert('Fehler', `Konto konnte nicht gelöscht werden: ${msg}`);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const mainPhoto = profile?.profile_images?.[0];
@@ -245,6 +309,22 @@ export default function ProfileScreen() {
         <Ionicons name="log-out-outline" size={18} color={COLORS.error} />
         <Text style={styles.signOutText}>Abmelden</Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.deleteBtn, deleting && { opacity: 0.5 }]}
+        onPress={handleDeleteAccount}
+        disabled={deleting}
+        activeOpacity={0.8}
+      >
+        {deleting ? (
+          <ActivityIndicator size="small" color={COLORS.textDim} />
+        ) : (
+          <Ionicons name="trash-outline" size={16} color={COLORS.textDim} />
+        )}
+        <Text style={styles.deleteBtnText}>
+          {deleting ? 'Wird gelöscht...' : 'Konto löschen'}
+        </Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -353,4 +433,9 @@ const styles = StyleSheet.create({
     borderRadius: 16, padding: 14,
   },
   signOutText: { color: COLORS.error, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    marginTop: 12, marginBottom: 8, padding: 12,
+  },
+  deleteBtnText: { color: COLORS.textDim, fontSize: 13, fontFamily: 'Inter_400Regular' },
 });
